@@ -1,0 +1,161 @@
+OUT_DIR = Some(/home/ilyk/projects/asgardtech/valkra/quantum-shield/target/debug/build/pqcrypto-kyber-b36b45b362560740/out)
+OPT_LEVEL = Some(0)
+TARGET = Some(x86_64-unknown-linux-gnu)
+CARGO_ENCODED_RUSTFLAGS = Some()
+HOST = Some(x86_64-unknown-linux-gnu)
+cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+CC_x86_64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+CC_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_CC
+HOST_CC = None
+cargo:rerun-if-env-changed=CC
+CC = None
+cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+RUSTC_WRAPPER = None
+cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+CRATE_CC_NO_DEFAULTS = None
+DEBUG = Some(true)
+CARGO_CFG_TARGET_FEATURE = Some(fxsr,sse,sse2)
+cargo:rerun-if-env-changed=CFLAGS
+CFLAGS = None
+cargo:rerun-if-env-changed=HOST_CFLAGS
+HOST_CFLAGS = None
+cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+CFLAGS_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+CFLAGS_x86_64-unknown-linux-gnu = None
+cargo:warning=pqclean/crypto_kem/kyber512/clean/ntt.c:92:41: warning: argument 1 of type 'int16_t[256]' {aka 'short int[256]'} with mismatched bound [-Warray-parameter=]
+cargo:warning=   92 | void PQCLEAN_KYBER512_CLEAN_ntt(int16_t poly[256]) {
+cargo:warning=      |                                 ~~~~~~~~^~~~~~~~~
+cargo:warning=In file included from pqclean/crypto_kem/kyber512/clean/ntt.c:1:
+cargo:warning=pqclean/crypto_kem/kyber512/clean/ntt.h:9:42: note: previously declared as 'int16_t *' {aka 'short int *'}
+cargo:warning=    9 | void PQCLEAN_KYBER512_CLEAN_ntt(int16_t *poly);
+cargo:warning=      |                                 ~~~~~~~~~^~~~
+cargo:warning=pqclean/crypto_kem/kyber512/clean/ntt.c:116:44: warning: argument 1 of type 'int16_t[256]' {aka 'short int[256]'} with mismatched bound [-Warray-parameter=]
+cargo:warning=  116 | void PQCLEAN_KYBER512_CLEAN_invntt(int16_t poly[256]) {
+cargo:warning=      |                                    ~~~~~~~~^~~~~~~~~
+cargo:warning=pqclean/crypto_kem/kyber512/clean/ntt.h:10:45: note: previously declared as 'int16_t *' {aka 'short int *'}
+cargo:warning=   10 | void PQCLEAN_KYBER512_CLEAN_invntt(int16_t *poly);
+cargo:warning=      |                                    ~~~~~~~~~^~~~
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+cargo:warning=pqclean/crypto_kem/kyber768/clean/ntt.c:92:41: warning: argument 1 of type 'int16_t[256]' {aka 'short int[256]'} with mismatched bound [-Warray-parameter=]
+cargo:warning=   92 | void PQCLEAN_KYBER768_CLEAN_ntt(int16_t poly[256]) {
+cargo:warning=      |                                 ~~~~~~~~^~~~~~~~~
+cargo:warning=In file included from pqclean/crypto_kem/kyber768/clean/ntt.c:1:
+cargo:warning=pqclean/crypto_kem/kyber768/clean/ntt.h:9:42: note: previously declared as 'int16_t *' {aka 'short int *'}
+cargo:warning=    9 | void PQCLEAN_KYBER768_CLEAN_ntt(int16_t *poly);
+cargo:warning=      |                                 ~~~~~~~~~^~~~
+cargo:warning=pqclean/crypto_kem/kyber768/clean/ntt.c:116:44: warning: argument 1 of type 'int16_t[256]' {aka 'short int[256]'} with mismatched bound [-Warray-parameter=]
+cargo:warning=  116 | void PQCLEAN_KYBER768_CLEAN_invntt(int16_t poly[256]) {
+cargo:warning=      |                                    ~~~~~~~~^~~~~~~~~
+cargo:warning=pqclean/crypto_kem/kyber768/clean/ntt.h:10:45: note: previously declared as 'int16_t *' {aka 'short int *'}
+cargo:warning=   10 | void PQCLEAN_KYBER768_CLEAN_invntt(int16_t *poly);
+cargo:warning=      |                                    ~~~~~~~~~^~~~
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+cargo:warning=pqclean/crypto_kem/kyber1024/clean/ntt.c:92:42: warning: argument 1 of type 'int16_t[256]' {aka 'short int[256]'} with mismatched bound [-Warray-parameter=]
+cargo:warning=   92 | void PQCLEAN_KYBER1024_CLEAN_ntt(int16_t poly[256]) {
+cargo:warning=      |                                  ~~~~~~~~^~~~~~~~~
+cargo:warning=In file included from pqclean/crypto_kem/kyber1024/clean/ntt.c:1:
+cargo:warning=pqclean/crypto_kem/kyber1024/clean/ntt.h:9:43: note: previously declared as 'int16_t *' {aka 'short int *'}
+cargo:warning=    9 | void PQCLEAN_KYBER1024_CLEAN_ntt(int16_t *poly);
+cargo:warning=      |                                  ~~~~~~~~~^~~~
+cargo:warning=pqclean/crypto_kem/kyber1024/clean/ntt.c:116:45: warning: argument 1 of type 'int16_t[256]' {aka 'short int[256]'} with mismatched bound [-Warray-parameter=]
+cargo:warning=  116 | void PQCLEAN_KYBER1024_CLEAN_invntt(int16_t poly[256]) {
+cargo:warning=      |                                     ~~~~~~~~^~~~~~~~~
+cargo:warning=pqclean/crypto_kem/kyber1024/clean/ntt.h:10:46: note: previously declared as 'int16_t *' {aka 'short int *'}
+cargo:warning=   10 | void PQCLEAN_KYBER1024_CLEAN_invntt(int16_t *poly);
+cargo:warning=      |                                     ~~~~~~~~~^~~~
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+exit status: 0
+cargo:rerun-if-env-changed=AR_x86_64-unknown-linux-gnu
+AR_x86_64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=AR_x86_64_unknown_linux_gnu
+AR_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_AR
+HOST_AR = None
+cargo:rerun-if-env-changed=AR
+AR = None
+cargo:rerun-if-env-changed=ARFLAGS
+ARFLAGS = None
+cargo:rerun-if-env-changed=HOST_ARFLAGS
+HOST_ARFLAGS = None
+cargo:rerun-if-env-changed=ARFLAGS_x86_64_unknown_linux_gnu
+ARFLAGS_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=ARFLAGS_x86_64-unknown-linux-gnu
+ARFLAGS_x86_64-unknown-linux-gnu = None
+cargo:rustc-link-lib=static=kyber
+cargo:rustc-link-search=native=/home/ilyk/projects/asgardtech/valkra/quantum-shield/target/debug/build/pqcrypto-kyber-b36b45b362560740/out
