@@ -136,38 +136,22 @@ verify(message, signature, pubkeys)      // Verify hybrid signature
 
 // Key management
 public_keys()                            // Export public keys
-save_to_file(path)                       // Save keys to disk
-load_from_file(path)                     // Load keys from disk
-export_public_keys_json()                // Export as JSON
-import_public_keys_json(json)            // Import from JSON
-
-// Advanced
-set_quantum_mode(enabled)                // Toggle PQC on/off
-needs_migration(version)                 // Check if re-encryption needed
-migrate_encryption(old, new_keys)        // Migrate to new algorithms
+PublicKeys::to_json()                    // Serialize to JSON
+PublicKeys::from_json(json)              // Deserialize from JSON
 ```
 
 ## Examples
 
-See the [`examples/`](examples/) directory for complete examples:
-
-- `basic_encryption.rs` - Simple hybrid encryption
-- `signatures.rs` - Digital signatures
-- `key_management.rs` - Key generation and storage
-- `server_client.rs` - Secure client-server communication
-- `async_example.rs` - Async/await support
+See [`examples/basic_usage.rs`](examples/basic_usage.rs) for a complete example showing encryption, decryption, signing, and verification.
 
 ## Testing
 
 ```bash
-# Run all tests
+# Run tests
 cargo test
 
-# Run with output
-cargo test -- --nocapture
-
-# Run benchmarks
-cargo bench
+# Run example
+cargo run --example basic_usage
 ```
 
 ## Security Considerations
@@ -211,24 +195,15 @@ cargo bench
 - [ ] Hardware acceleration (v0.4)
 - [ ] Additional PQC algorithms (SPHINCS+, etc.) (v0.5)
 
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
 ## Security Audits
 
 This library has not undergone professional security audit.
 
-For security vulnerabilities, email security@valkra.io instead of opening public issues.
+For security vulnerabilities, email security@redasgard.com instead of opening public issues.
 
 ## License
 
-Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
+MIT License - see [LICENSE-MIT](LICENSE-MIT)
 
 ## References
 
