@@ -190,25 +190,23 @@ mod tests {
 
     #[test]
     fn test_hybrid_encryption() {
-        let alice = HybridCrypto::generate_keypair()?;
-        let bob = HybridCrypto::generate_keypair()?;
-        
+        let alice = HybridCrypto::generate().unwrap();
+        let bob = HybridCrypto::generate().unwrap();
+
         let message = b"Secret message";
-        let encrypted = alice.encrypt(message, &bob.public_keys())?;
-        let decrypted = bob.decrypt(&encrypted)?;
-        
+        let envelope = alice.seal_for(message, bob.public_keys()).unwrap();
+        let decrypted = bob.open(&envelope).unwrap();
+
         assert_eq!(message, &decrypted[..]);
     }
 
     #[test]
     fn test_hybrid_signatures() {
-        let alice = HybridCrypto::generate_keypair()?;
-        
+        let alice = HybridCrypto::generate().unwrap();
+
         let message = b"Message to sign";
-        let signature = alice.sign(message)?;
-        let valid = alice.verify(message, &signature, &alice.public_keys())?;
-        
-        assert!(valid);
+        let signature = alice.sign(message, b"").unwrap();
+        quantum_shield::verify(message, b"", &signature, alice.public_keys()).unwrap();
     }
 }
 ```
@@ -228,10 +226,10 @@ Quantum Shield is a security-critical library. When contributing:
 ### Security Testing
 
 ```bash
-# Run security tests
-cargo test test_private_key_security
-cargo test test_encryption_security
-cargo test test_signature_security
+# Run the adversarial suites
+cargo test --test tamper
+cargo test --test downgrade
+cargo test --test proptests
 
 # Test with examples
 cargo run --example basic_usage
@@ -271,13 +269,13 @@ Instead:
 
 ```
 docs/
-├── README.md              # Main documentation
-├── getting-started.md      # Quick start guide
-├── api-reference.md       # Complete API docs
-├── cryptography-guide.md  # Cryptographic concepts guide
-├── best-practices.md      # Usage guidelines
-└── faq.md                 # Frequently asked questions
+├── design.md               # Normative v2 wire-format + combiner spec
+├── security-model.md       # Threat model and non-goals
+└── migration-v1-to-v2.md   # Upgrading from 0.1.x
 ```
+
+Complete API documentation is generated from doc comments and published on
+[docs.rs](https://docs.rs/quantum-shield).
 
 ### Writing Documentation
 
@@ -346,10 +344,16 @@ Before releasing:
 
 ### Algorithm Categories
 
-1. **Post-Quantum KEM**: Kyber, NTRU, SABER
-2. **Post-Quantum Signatures**: Dilithium, SPHINCS+, Falcon
-3. **Classical Cryptography**: RSA, ECDSA, AES
-4. **Hybrid Systems**: Classical + Post-Quantum combinations
+Quantum Shield builds on hybrid systems that AND-compose a classical and a
+post-quantum primitive:
+
+1. **Post-Quantum KEM**: ML-KEM (FIPS 203); the suite currently uses ML-KEM-1024
+2. **Post-Quantum Signatures**: ML-DSA (FIPS 204); the suite currently uses ML-DSA-87
+3. **Classical primitives**: X25519, Ed25519, AES-256-GCM, SHA3
+4. **Hybrid Systems**: classical + post-quantum combined through a KDF/framing so both must be broken
+
+New algorithms are introduced as new cipher-suite ids, never as silent
+negotiation within an existing suite.
 
 ### Algorithm Development Process
 
