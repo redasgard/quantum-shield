@@ -7,9 +7,9 @@ cryptography library. Updated as of **v0.2.1** on branch
 **Legend:** ✅ done · 🟡 partial · ❌ missing · ⬜ out of scope by design (v2)
 
 Gap-closing is staged across releases: **0.2.1** (assurance/tooling, done),
-**0.2.2** (hardening: no_std, constant-time, PKCS#8/PEM), **0.3.0** (features:
-multi-recipient, streaming, rotation). See the "Testing & QA" and
-"CI/supply chain" sections for what 0.2.1 already landed.
+**0.2.2** (hardening: no_std, constant-time, PKCS#8/PEM, done), **0.3.0**
+(features: multi-recipient, streaming, rotation — next). The section tables
+mark which release landed each item.
 
 ## 1. Cryptographic core
 
@@ -34,8 +34,8 @@ multi-recipient, streaming, rotation). See the "Testing & QA" and
 | Zeroization of private key material | ✅ | Seeds + shared secrets, `zeroize`/`Zeroizing` |
 | `Debug` redaction of secrets | ✅ | `KeyPair`/`PublicKeyBundle` |
 | Uniform decryption/verification errors (no oracle) | ✅ | `Error::DecryptionFailed` carries no detail |
-| Constant-time primitives | 🟡 | Inherited from dalek/RustCrypto; **not independently verified** |
-| Constant-time verification (dudect / ctgrind) | ❌ | No timing-leakage test harness |
+| Constant-time primitives | 🟡 | Inherited from dalek/RustCrypto; not independently verified, but now regression-checked (below) |
+| Constant-time regression harness (dudect) | ✅ | `examples/dudect.rs` on `open`; low t locally; non-gating CI (0.2.2) |
 | Fault-injection / EM resistance | ❌ | No claims, no mitigations |
 
 ## 3. API & interoperability
@@ -46,8 +46,8 @@ multi-recipient, streaming, rotation). See the "Testing & QA" and
 | Versioned binary wire format, unknown-version rejection | ✅ | `src/wire.rs`, `docs/design.md` |
 | serde support (optional feature) | ✅ | `src/serde_impls.rs` |
 | Interop with an independent implementation | 🟡 | Format is specified (`docs/design.md`) but no second implementation validated against it |
-| Standard key encodings (PKCS#8/SPKI/PEM) | ❌ | Custom binary bundles only |
-| `no_std` support | ❌ | std-only (crate `no-std` category was removed) |
+| Standard key encodings (PKCS#8/SPKI/PEM) | ✅ | `pem` feature: per-component SPKI PEM for ML-KEM/ML-DSA/Ed25519, raw block for X25519 (0.2.2) |
+| `no_std` support | ✅ | `#![no_std]` + `alloc`; bare-metal CI gate (`thumbv7em-none-eabi`) (0.2.2) |
 | Async API | ⬜ | Removed; ops are CPU-bound, not IO-bound |
 
 ## 4. Testing & QA
@@ -91,14 +91,14 @@ multi-recipient, streaming, rotation). See the "Testing & QA" and
 ## Remaining gaps (post-0.2.1)
 
 Closed in 0.2.1: parser fuzzing, RFC/ML-KEM/ML-DSA in-crate vectors, criterion
-benchmarks, coverage, and `cargo-semver-checks`. Still open:
+benchmarks, coverage, `cargo-semver-checks`. Closed in 0.2.2: `no_std`+`alloc`
+(bare-metal CI gate), dudect constant-time regression harness, PKCS#8/PEM
+public-key interop. Still open:
 
 1. **Confirm the Apple Silicon CI gate is green** — CI now runs on this branch;
    verify the `macos-15` job passed on GitHub (the requirement isn't met until
    it does).
-2. **`no_std` support, constant-time harness, PKCS#8/PEM interop** — the 0.2.2
-   hardening milestone.
-3. **Multi-recipient, streaming, key rotation** — the 0.3.0 feature milestone.
-4. **Signed releases / SLSA / SBOM** — supply-chain attestation.
-5. **Independent audit** — the one gap that external work, not code, must close
+2. **Multi-recipient, streaming, key rotation** — the 0.3.0 feature milestone.
+3. **Signed releases / SLSA / SBOM** — supply-chain attestation.
+4. **Independent audit** — the one gap that external work, not code, must close
    before "production-grade" is fully honest.

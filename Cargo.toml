@@ -1,6 +1,6 @@
 [package]
 name = "quantum-shield"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 rust-version = "1.85"
 authors = ["valh4x"]
@@ -23,6 +23,7 @@ zeroize = { version = "1.8", default-features = false, features = ["derive", "al
 subtle = { version = "2.6", default-features = false }
 thiserror = { version = "2", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
+pem-rfc7468 = { version = "0.7", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.7.0", default-features = false, features = ["cargo_bench_support"] }
@@ -40,6 +41,15 @@ default = ["std"]
 # `no_std` + `alloc` build. `alloc` is always required.
 std = ["thiserror/std", "ed25519-dalek/std", "serde?/std"]
 serde = ["dep:serde"]
+# Per-component PEM export/import of public keys: standard SubjectPublicKeyInfo
+# for ML-KEM, ML-DSA, and Ed25519; a raw block for X25519 (which has no PKCS#8
+# support). QSP2/QSK2 remain the primary key formats.
+pem = [
+    "dep:pem-rfc7468",
+    "ml-kem/pkcs8", "ml-kem/pem",
+    "ml-dsa/pkcs8",
+    "ed25519-dalek/pkcs8", "ed25519-dalek/pem",
+]
 
 [[bench]]
 name = "crypto"

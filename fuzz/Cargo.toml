@@ -13,6 +13,7 @@ arbitrary = { version = "1", features = ["derive"] }
 
 [dependencies.quantum-shield]
 path = ".."
+features = ["pem", "serde"]
 
 # Prevent this crate from being pulled into the parent workspace.
 [workspace]
@@ -58,6 +59,13 @@ bench = false
 [[bin]]
 name = "roundtrip_sign_verify"
 path = "fuzz_targets/roundtrip_sign_verify.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "public_bundle_from_pem"
+path = "fuzz_targets/public_bundle_from_pem.rs"
 test = false
 doc = false
 bench = false

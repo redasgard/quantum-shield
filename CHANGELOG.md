@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-07-04
+
+Hardening. `std` remains a default feature, so existing users are unaffected;
+all additions are opt-in.
+
+### Added
+
+- `no_std` support: the crate is `#![no_std]` and needs only `alloc`. Disable
+  the default `std` feature for embedded targets (supply a `getrandom` backend;
+  CI compiles the full API for `thumbv7em-none-eabi`).
+- `pem` feature: `PublicKeyBundle::{to_pem, from_pem}` — per-component PEM for
+  the public keys (standard SubjectPublicKeyInfo for ML-KEM/ML-DSA/Ed25519, a
+  raw block for X25519). The `QSP2` bundle stays the primary format; PEM import
+  round-trips through it, so it enforces the same validation. A fuzz target
+  covers the new parser.
+- `examples/dudect.rs`: a dudect constant-time regression harness on `open`
+  (decapsulate + AEAD), wired as a non-gating CI job. Measures low t-values
+  locally, confirming decryption-failure timing does not leak.
+
+### Changed
+
+- Dependencies are built with `default-features = false` + `alloc`; `ml-dsa`
+  drops its `getrandom` default (signing is deterministic) and `ed25519-dalek`
+  uses `alloc` instead of `std` unless the `std` feature is on.
+
 ## [0.2.1] - 2026-07-04
 
 Assurance and tooling; no source or wire-format changes (API-compatible with

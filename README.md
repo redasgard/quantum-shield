@@ -134,6 +134,9 @@ threat model in [docs/security-model.md](docs/security-model.md).
   `no_std` build.
 - `serde` (off by default): `Serialize`/`Deserialize` for the wire types as
   validated byte strings.
+- `pem` (off by default): `PublicKeyBundle::{to_pem, from_pem}` — per-component
+  PEM export of the public keys (standard SPKI for ML-KEM/ML-DSA/Ed25519, a raw
+  block for X25519). The compact `QSP2` bundle remains the primary format.
 
 ## `no_std`
 

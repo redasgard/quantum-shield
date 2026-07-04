@@ -61,6 +61,9 @@ mod constants;
 mod error;
 mod hybrid_kem;
 mod keys;
+#[cfg(feature = "pem")]
+#[cfg_attr(docsrs, doc(cfg(feature = "pem")))]
+mod pem;
 mod seal;
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
