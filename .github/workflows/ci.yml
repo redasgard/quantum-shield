@@ -113,6 +113,20 @@ jobs:
           fail_ci_if_error: false
         continue-on-error: true
 
+  constant-time:
+    name: constant-time (dudect, non-gating)
+    # Noisy statistical harness: run on demand and on a schedule, never as a
+    # PR gate. A large/growing t-value is a signal to investigate, not a
+    # hard failure.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run --release --example dudect
+        continue-on-error: true
+
   fuzz:
     name: fuzz (smoke)
     runs-on: ubuntu-latest

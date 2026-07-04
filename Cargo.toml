@@ -26,6 +26,7 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 
 [dev-dependencies]
 criterion = { version = "0.7.0", default-features = false, features = ["cargo_bench_support"] }
+dudect-bencher = "0.7.0"
 hex = "0.4"
 hex-literal = "1"
 ml-kem = { version = "0.3.2", features = ["hazmat"] }
@@ -47,6 +48,11 @@ harness = false
 [[bench]]
 name = "codec"
 harness = false
+
+# The constant-time harness is a dudect-bencher example (run manually:
+# `cargo run --release --example dudect`), not a criterion bench.
+[[example]]
+name = "dudect"
 
 [package.metadata.docs.rs]
 all-features = true
