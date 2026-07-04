@@ -4,7 +4,6 @@
 
 use crate::{Error, Result, PublicKeys, PrivateKeys, KeyPair, HybridCiphertext, HybridSignature};
 use crate::constants::*;
-use crate::security::{SecurityManager, EntropyMonitor, TimingProtection, SecureMemory, constant_time_compare};
 use base64::{engine::general_purpose, Engine};
 use rsa::{RsaPrivateKey, RsaPublicKey, Oaep};
 use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, DecodePrivateKey, DecodePublicKey};
@@ -18,14 +17,12 @@ use pqcrypto_kyber::kyber1024;
 use pqcrypto_dilithium::dilithium5;
 use pqcrypto_traits::kem::{PublicKey as KemPublicKey, SecretKey as KemSecretKey, Ciphertext as _, SharedSecret as _};
 use pqcrypto_traits::sign::{PublicKey as SignPublicKey, SecretKey as SignSecretKey, DetachedSignature as _};
-use zeroize::{Zeroize, ZeroizeOnDrop};
-use std::sync::Arc;
+use rand::RngCore;
 
 /// Main hybrid cryptography engine
 pub struct HybridCrypto {
     keypair: KeyPair,
     quantum_mode: bool,
-    security_manager: Arc<SecurityManager>,
 }
 
 impl HybridCrypto {
@@ -39,17 +36,7 @@ impl HybridCrypto {
     /// let crypto = HybridCrypto::generate_keypair().unwrap();
     /// ```
     pub fn generate_keypair() -> Result<Self> {
-        let security_manager = Arc::new(SecurityManager::new());
-        
-        // Ensure sufficient entropy before key generation
-        if !security_manager.entropy_monitor().has_sufficient_entropy() {
-            security_manager.entropy_monitor().collect_entropy()?;
-        }
-        
-        // Add timing jitter for protection
-        security_manager.timing_protection().add_jitter()?;
-        
-        // Generate RSA-4096 keypair with enhanced security
+        // Generate RSA-4096 keypair
         let mut rng = rand::thread_rng();
         let rsa_private = RsaPrivateKey::new(&mut rng, 4096)
             .map_err(|e| Error::KeyGenerationFailed(format!("RSA generation failed: {}", e)))?;
@@ -82,25 +69,14 @@ impl HybridCrypto {
         Ok(Self {
             keypair,
             quantum_mode: true,
-            security_manager,
         })
     }
-    
+
     /// Get public keys for sharing
     pub fn public_keys(&self) -> &PublicKeys {
         self.keypair.public_keys()
     }
-    
-    /// Get security manager for advanced security operations
-    pub fn security_manager(&self) -> &Arc<SecurityManager> {
-        &self.security_manager
-    }
-    
-    /// Run security audit on the current crypto instance
-    pub fn audit_security(&self) -> crate::security::SecurityAuditResult {
-        self.security_manager.audit_security()
-    }
-    
+
     /// Encrypt data for a recipient using hybrid encryption
     ///
     /// # Arguments
@@ -119,14 +95,10 @@ impl HybridCrypto {
     /// let encrypted = alice.encrypt(b"secret", &bob.public_keys()).unwrap();
     /// ```
     pub fn encrypt(&self, data: &[u8], recipient_pubkeys: &PublicKeys) -> Result<HybridCiphertext> {
-        // Add timing jitter for protection
-        self.security_manager.timing_protection().add_jitter()?;
-        
-        // Generate random symmetric key using secure memory
-        let symmetric_key_mem = self.security_manager.secure_key_generation()?;
-        let symmetric_key: [u8; 32] = symmetric_key_mem.as_slice()[..32].try_into()
-            .map_err(|_| Error::EncryptionFailed("Invalid symmetric key length".to_string()))?;
-        
+        // Generate random symmetric key
+        let mut symmetric_key = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut symmetric_key);
+
         // Encrypt data with AES-256-GCM
         let key = Key::<Aes256Gcm>::from_slice(&symmetric_key);
         let cipher = Aes256Gcm::new(key);
@@ -189,9 +161,6 @@ impl HybridCrypto {
     /// let decrypted = bob.decrypt(&encrypted).unwrap();
     /// ```
     pub fn decrypt(&self, ciphertext: &HybridCiphertext) -> Result<Vec<u8>> {
-        // Add timing jitter for protection
-        self.security_manager.timing_protection().add_jitter()?;
-        
         let encrypted_data = general_purpose::STANDARD.decode(&ciphertext.ciphertext)
             .map_err(|e| Error::InvalidCiphertext(format!("Ciphertext decode failed: {}", e)))?;
         
@@ -274,9 +243,6 @@ impl HybridCrypto {
     /// let signature = alice.sign(b"message to sign").unwrap();
     /// ```
     pub fn sign(&self, message: &[u8]) -> Result<HybridSignature> {
-        // Add timing jitter for protection
-        self.security_manager.timing_protection().add_jitter()?;
-        
         let rsa_sig = self.sign_rsa(message)?;
         let dilithium_sig = if self.quantum_mode {
             Some(self.sign_dilithium(message)?)

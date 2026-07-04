@@ -39,18 +39,12 @@ mod crypto;
 mod error;
 mod keys;
 mod types;
-mod security;
 
 pub use constants::*;
 pub use crypto::HybridCrypto;
 pub use error::{Error, Result};
 pub use keys::{PublicKeys, PrivateKeys, KeyPair};
 pub use types::{HybridCiphertext, HybridSignature, CryptoVersion};
-pub use security::{
-    SecurityManager, EntropyMonitor, TimingProtection, SecureMemory,
-    AlgorithmAgility, SecurityAuditResult, constant_time_compare,
-    constant_time_select
-};
 
 /// Re-export commonly used types
 pub mod prelude {
