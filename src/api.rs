@@ -102,6 +102,16 @@ impl HybridCrypto {
         crate::multi::open_multi(&self.keypair, envelope)
     }
 
+    /// Begin decrypting a streaming envelope from its header bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidEnvelope`](crate::Error::InvalidEnvelope) if the
+    /// header is malformed.
+    pub fn stream_opener(&self, header: &[u8]) -> Result<crate::StreamOpener> {
+        crate::StreamOpener::new(&self.keypair, header)
+    }
+
     /// Sign `message` under an application `context` (0–255 bytes) with both
     /// Ed25519 and ML-DSA-87.
     ///

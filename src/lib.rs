@@ -70,6 +70,7 @@ mod seal;
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 mod serde_impls;
 mod sign;
+mod stream;
 mod types;
 mod wire;
 
@@ -79,6 +80,7 @@ pub use error::{Error, Result};
 pub use keys::{KeyPair, PublicKeyBundle};
 pub use multi::{open_multi, seal_multi, MultiRecipientEnvelope};
 pub use seal::{open, seal};
+pub use stream::{StreamOpener, StreamSealer};
 pub use types::{Envelope, HybridSignature};
 pub use zeroize::Zeroizing;
 
