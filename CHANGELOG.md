@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-04
+
+Assurance and tooling; no source or wire-format changes (API-compatible with
+0.2.0).
+
+### Added
+
+- Criterion benchmarks (`benches/crypto.rs`, `benches/codec.rs`) for key
+  generation, seal/open, sign/verify, and the wire codecs — measured numbers
+  replacing the fabricated ones removed in 0.2.0.
+- In-crate known-answer tests: RFC 7748 (X25519) and RFC 8032 (Ed25519)
+  official vectors, plus deterministic stability KATs for ML-KEM-1024 and
+  ML-DSA-87 that pin the parameter set and FIPS sizes against the locked
+  crate versions (full ACVP conformance remains covered upstream).
+- `fuzz/` cargo-fuzz crate: six libFuzzer targets covering every `from_bytes`
+  parser and the seal/open and sign/verify roundtrips.
+- CI jobs: `cargo-semver-checks` (baseline `v0.2.0`), coverage
+  (`cargo-llvm-cov` → Codecov, non-gating), and a nightly fuzz smoke run.
+
 ## [0.2.0] - 2026-07-04
 
 Complete cryptographic rewrite. **Breaking in every dimension: algorithms,

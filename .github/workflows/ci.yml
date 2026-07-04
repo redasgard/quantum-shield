@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "claude/**"]
   pull_request:
 
 env:
@@ -66,3 +66,52 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check advisories bans licenses sources
+
+  semver:
+    name: semver-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need history + tags for the baseline
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          # Compare the current API against the last released tag. The wire
+          # types are byte-serialized, so this also guards the wire format.
+          baseline-rev: v0.2.0
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v2
+      - name: Coverage
+        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+      - uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  fuzz:
+    name: fuzz (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-fuzz
+      - name: Smoke-run each target
+        run: |
+          for t in envelope_from_bytes signature_from_bytes \
+                   public_bundle_from_bytes secret_from_bytes \
+                   roundtrip_seal_open roundtrip_sign_verify; do
+            echo "::group::$t"
+            cargo fuzz run "$t" -- -max_total_time=45 -print_final_stats=1
+            echo "::endgroup::"
+          done
