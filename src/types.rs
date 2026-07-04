@@ -1,109 +1,123 @@
-//! Core types for hybrid cryptography
+//! Wire types: [`Envelope`] and [`HybridSignature`].
 
-use serde::{Deserialize, Serialize};
+use crate::constants::*;
+use crate::error::{Error, Result};
+use crate::wire::{read_header, take, write_header};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 
-/// Cryptography version for algorithm agility
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CryptoVersion(pub u32);
+/// An encrypted message: hybrid KEM ciphertext plus AEAD-protected payload.
+///
+/// Wire layout (`QSE2`):
+///
+/// ```text
+/// magic[4] | version u8 | suite u8 | epk_x25519[32] | ct_mlkem[1568] | nonce[12] | aead_ct[..]
+/// ```
+///
+/// Everything before `aead_ct` is authenticated as AEAD associated data, so
+/// no header field can be modified without failing decryption.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Envelope {
+    /// Sender's ephemeral X25519 public key.
+    pub(crate) epk_x25519: [u8; X25519_PK_LEN],
+    /// ML-KEM-1024 ciphertext.
+    pub(crate) ct_mlkem: Box<[u8; MLKEM1024_CT_LEN]>,
+    /// AES-256-GCM nonce.
+    pub(crate) nonce: [u8; NONCE_LEN],
+    /// AES-256-GCM ciphertext (plaintext length + 16-byte tag).
+    pub(crate) ciphertext: Vec<u8>,
+}
 
-impl CryptoVersion {
-    /// Current version
-    pub const CURRENT: CryptoVersion = CryptoVersion(1);
-    
-    /// Check if this version is supported
-    pub fn is_supported(&self) -> bool {
-        self.0 <= Self::CURRENT.0
+impl Envelope {
+    /// Serialize to the v2 envelope format.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(ENVELOPE_AAD_LEN + self.ciphertext.len());
+        self.write_aad(&mut out);
+        out.extend_from_slice(&self.ciphertext);
+        out
     }
-}
 
-impl Default for CryptoVersion {
-    fn default() -> Self {
-        Self::CURRENT
+    /// Write the authenticated prefix (header through nonce) to `out`.
+    pub(crate) fn write_aad(&self, out: &mut Vec<u8>) {
+        let start = out.len();
+        write_header(out, MAGIC_ENVELOPE);
+        out.extend_from_slice(&self.epk_x25519);
+        out.extend_from_slice(self.ct_mlkem.as_ref());
+        out.extend_from_slice(&self.nonce);
+        debug_assert_eq!(out.len() - start, ENVELOPE_AAD_LEN);
     }
-}
 
-/// Hybrid encrypted data (RSA + Kyber + AES)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HybridCiphertext {
-    /// Crypto version for forward compatibility
-    pub version: CryptoVersion,
-    
-    /// AES-256-GCM encrypted data (base64)
-    pub ciphertext: String,
-    
-    /// Symmetric key encrypted with RSA-4096 (base64)
-    pub encrypted_key_rsa: String,
-    
-    /// Symmetric key encrypted with Kyber-1024 (base64)
-    pub encrypted_key_kyber: String,
-    
-    /// Algorithm description for informational purposes
-    pub algorithm: String,
-}
-
-impl HybridCiphertext {
-    /// Create a new hybrid ciphertext
-    pub fn new(
-        ciphertext: String,
-        encrypted_key_rsa: String,
-        encrypted_key_kyber: String,
-    ) -> Self {
-        Self {
-            version: CryptoVersion::CURRENT,
-            ciphertext,
-            encrypted_key_rsa,
-            encrypted_key_kyber,
-            algorithm: "AES-256-GCM + RSA-4096-OAEP + Kyber-1024".to_string(),
+    /// Parse a v2 envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidEnvelope`] on malformed input,
+    /// [`Error::LegacyV1Artifact`] for 0.1.x JSON artifacts, and
+    /// version/suite errors for unknown formats.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut rest = read_header(bytes, MAGIC_ENVELOPE, Error::InvalidEnvelope)?;
+        let epk_x25519 = take(&mut rest, Error::InvalidEnvelope)?;
+        let ct_mlkem: [u8; MLKEM1024_CT_LEN] = take(&mut rest, Error::InvalidEnvelope)?;
+        let nonce = take(&mut rest, Error::InvalidEnvelope)?;
+        if rest.len() < TAG_LEN {
+            return Err(Error::InvalidEnvelope);
         }
-    }
-    
-    /// Serialize to JSON
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(self)
-    }
-    
-    /// Deserialize from JSON
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
+        Ok(Self {
+            epk_x25519,
+            ct_mlkem: Box::new(ct_mlkem),
+            nonce,
+            ciphertext: rest.to_vec(),
+        })
     }
 }
 
-/// Hybrid digital signature (RSA + Dilithium)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A hybrid signature: Ed25519 and ML-DSA-87, both always present.
+///
+/// Wire layout (`QSS2`, fixed 4697 bytes):
+///
+/// ```text
+/// magic[4] | version u8 | suite u8 | ed25519_sig[64] | mldsa_sig[4627]
+/// ```
+///
+/// Verification requires **both** components to be valid; there is no way to
+/// strip the post-quantum signature and still verify.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HybridSignature {
-    /// Crypto version
-    pub version: CryptoVersion,
-    
-    /// RSA-4096-PSS signature (base64)
-    pub rsa_signature: String,
-    
-    /// Dilithium5 signature (base64, optional for backward compatibility)
-    pub dilithium_signature: Option<String>,
+    /// Ed25519 signature over the framed message.
+    pub(crate) ed25519: [u8; ED25519_SIG_LEN],
+    /// ML-DSA-87 signature over the framed message.
+    pub(crate) mldsa: Box<[u8; MLDSA87_SIG_LEN]>,
 }
 
 impl HybridSignature {
-    /// Create a new hybrid signature
-    pub fn new(rsa_signature: String, dilithium_signature: Option<String>) -> Self {
-        Self {
-            version: CryptoVersion::CURRENT,
-            rsa_signature,
-            dilithium_signature,
+    /// Serialize to the v2 signature format (fixed 4697 bytes).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(SIGNATURE_LEN);
+        write_header(&mut out, MAGIC_SIGNATURE);
+        out.extend_from_slice(&self.ed25519);
+        out.extend_from_slice(self.mldsa.as_ref());
+        debug_assert_eq!(out.len(), SIGNATURE_LEN);
+        out
+    }
+
+    /// Parse a v2 signature.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidSignature`] on malformed input,
+    /// [`Error::LegacyV1Artifact`] for 0.1.x JSON artifacts, and
+    /// version/suite errors for unknown formats.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let mut rest = read_header(bytes, MAGIC_SIGNATURE, Error::InvalidSignature)?;
+        let ed25519 = take(&mut rest, Error::InvalidSignature)?;
+        let mldsa: [u8; MLDSA87_SIG_LEN] = take(&mut rest, Error::InvalidSignature)?;
+        if !rest.is_empty() {
+            return Err(Error::InvalidSignature);
         }
-    }
-    
-    /// Check if this signature includes post-quantum component
-    pub fn is_quantum_resistant(&self) -> bool {
-        self.dilithium_signature.is_some()
-    }
-    
-    /// Serialize to JSON
-    pub fn to_json(&self) -> Result<String, serde_json::Error> {
-        serde_json::to_string(self)
-    }
-    
-    /// Deserialize from JSON
-    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str(json)
+        Ok(Self {
+            ed25519,
+            mldsa: Box::new(mldsa),
+        })
     }
 }
 
@@ -111,36 +125,65 @@ impl HybridSignature {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_version() {
-        let v = CryptoVersion::CURRENT;
-        assert!(v.is_supported());
-        
-        let future = CryptoVersion(999);
-        assert!(!future.is_supported());
+    fn dummy_envelope() -> Envelope {
+        Envelope {
+            epk_x25519: [1; X25519_PK_LEN],
+            ct_mlkem: Box::new([2; MLKEM1024_CT_LEN]),
+            nonce: [3; NONCE_LEN],
+            ciphertext: vec![4; 40],
+        }
     }
 
     #[test]
-    fn test_ciphertext_serialization() {
-        let ct = HybridCiphertext::new(
-            "ciphertext".to_string(),
-            "rsa_key".to_string(),
-            "kyber_key".to_string(),
+    fn envelope_roundtrip() {
+        let env = dummy_envelope();
+        let bytes = env.to_bytes();
+        assert_eq!(bytes.len(), ENVELOPE_AAD_LEN + 40);
+        assert_eq!(Envelope::from_bytes(&bytes).unwrap(), env);
+    }
+
+    #[test]
+    fn envelope_rejects_truncation() {
+        let bytes = dummy_envelope().to_bytes();
+        // Anything shorter than AAD + tag must fail.
+        for len in [
+            0,
+            5,
+            HEADER_LEN,
+            ENVELOPE_AAD_LEN,
+            ENVELOPE_AAD_LEN + TAG_LEN - 1,
+        ] {
+            assert!(Envelope::from_bytes(&bytes[..len]).is_err(), "len={len}");
+        }
+    }
+
+    #[test]
+    fn signature_roundtrip() {
+        let sig = HybridSignature {
+            ed25519: [5; ED25519_SIG_LEN],
+            mldsa: Box::new([6; MLDSA87_SIG_LEN]),
+        };
+        let bytes = sig.to_bytes();
+        assert_eq!(bytes.len(), SIGNATURE_LEN);
+        assert_eq!(HybridSignature::from_bytes(&bytes).unwrap(), sig);
+    }
+
+    #[test]
+    fn signature_rejects_wrong_length() {
+        let sig = HybridSignature {
+            ed25519: [5; ED25519_SIG_LEN],
+            mldsa: Box::new([6; MLDSA87_SIG_LEN]),
+        };
+        let bytes = sig.to_bytes();
+        assert_eq!(
+            HybridSignature::from_bytes(&bytes[..bytes.len() - 1]).unwrap_err(),
+            Error::InvalidSignature
         );
-        
-        let json = ct.to_json().unwrap();
-        let ct2 = HybridCiphertext::from_json(&json).unwrap();
-        
-        assert_eq!(ct.ciphertext, ct2.ciphertext);
-    }
-
-    #[test]
-    fn test_signature_quantum_resistant() {
-        let sig1 = HybridSignature::new("rsa".to_string(), None);
-        assert!(!sig1.is_quantum_resistant());
-        
-        let sig2 = HybridSignature::new("rsa".to_string(), Some("dilithium".to_string()));
-        assert!(sig2.is_quantum_resistant());
+        let mut long = bytes.clone();
+        long.push(0);
+        assert_eq!(
+            HybridSignature::from_bytes(&long).unwrap_err(),
+            Error::InvalidSignature
+        );
     }
 }
-

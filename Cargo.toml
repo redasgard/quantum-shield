@@ -1,58 +1,69 @@
 [package]
 name = "quantum-shield"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
+rust-version = "1.85"
 authors = ["valh4x"]
-description = "Hybrid quantum-resistant cryptography using NIST-standardized post-quantum algorithms (Kyber, Dilithium)"
+description = "Hybrid post-quantum cryptography: X25519 + ML-KEM-1024 encryption and Ed25519 + ML-DSA-87 signatures"
 license = "MIT"
 repository = "https://github.com/redasgard/quantum-shield"
-keywords = ["cryptography", "post-quantum", "quantum-resistant", "kyber", "dilithium"]
-categories = ["cryptography", "no-std"]
+keywords = ["cryptography", "post-quantum", "ml-kem", "ml-dsa", "hybrid"]
+categories = ["cryptography"]
 readme = "README.md"
 
 [dependencies]
-# Error handling
-anyhow = "1.0"
-thiserror = "1.0"
-
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-base64 = "0.21"
-
-# Classical cryptography
-rsa = "0.9"
-sha2 = "0.10"
-sha3 = "0.10"
-aes-gcm = "0.10"
-
-# Post-Quantum Cryptography (NIST-standardized)
-pqcrypto-kyber = "0.5"
-pqcrypto-dilithium = "0.5"
-pqcrypto-traits = "0.3"
-
-# Randomness
-rand = "0.8"
-
-# Optional async support
-tokio = { version = "1.0", features = ["sync"], optional = true }
-
-# Zeroization for secure memory handling
-zeroize = { version = "1.7", features = ["derive"] }
-
-# Security enhancements
-subtle = "2.5"
-rand_core = "0.6"
+ml-kem = { version = "0.3.2", default-features = false, features = ["alloc", "zeroize", "getrandom"] }
+ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc", "zeroize"] }
+x25519-dalek = { version = "2.0.1", default-features = false, features = ["static_secrets", "zeroize"] }
+ed25519-dalek = { version = "2.2.0", default-features = false, features = ["alloc", "fast", "zeroize"] }
+aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc", "zeroize"] }
+sha3 = { version = "0.12", default-features = false }
+getrandom = "0.4"
+zeroize = { version = "1.8", default-features = false, features = ["derive", "alloc"] }
+subtle = { version = "2.6", default-features = false }
+thiserror = { version = "2", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
+pem-rfc7468 = { version = "0.7", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["full", "test-util"] }
+criterion = { version = "0.7.0", default-features = false, features = ["cargo_bench_support"] }
+dudect-bencher = "0.7.0"
+hex = "0.4"
+hex-literal = "1"
+ml-kem = { version = "0.3.2", features = ["hazmat"] }
+proptest = "1"
+serde_json = "1"
 
 [features]
 default = ["std"]
-std = []
-async = ["tokio"]
+# `std` enables `std::error::Error` for the error type and the std-specific
+# features of dependencies. Disable it (`--no-default-features`) for a
+# `no_std` + `alloc` build. `alloc` is always required.
+std = ["thiserror/std", "ed25519-dalek/std", "serde?/std"]
+serde = ["dep:serde"]
+# Per-component PEM export/import of public keys: standard SubjectPublicKeyInfo
+# for ML-KEM, ML-DSA, and Ed25519; a raw block for X25519 (which has no PKCS#8
+# support). QSP2/QSK2 remain the primary key formats.
+pem = [
+    "dep:pem-rfc7468",
+    "ml-kem/pkcs8", "ml-kem/pem",
+    "ml-dsa/pkcs8",
+    "ed25519-dalek/pkcs8", "ed25519-dalek/pem",
+]
+
+[[bench]]
+name = "crypto"
+harness = false
+
+[[bench]]
+name = "codec"
+harness = false
+
+# The constant-time harness is a dudect-bencher example (run manually:
+# `cargo run --release --example dudect`), not a criterion bench.
+[[example]]
+name = "dudect"
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
-

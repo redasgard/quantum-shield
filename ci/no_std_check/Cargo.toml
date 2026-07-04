@@ -1,0 +1,16 @@
+[package]
+name = "no_std_check"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Standalone crate: proves quantum-shield compiles for a bare-metal
+# `no_std` + `alloc` target with no OS randomness backend.
+[workspace]
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+quantum-shield = { path = "../..", default-features = false }
+getrandom = "0.4"

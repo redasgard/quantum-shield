@@ -1,0 +1,9 @@
+# Build for a bare-metal Cortex-M target by default, and select getrandom's
+# custom backend (this crate provides the implementation in src/lib.rs). This
+# is what makes `cargo check` here a genuine no_std gate: the target has no OS,
+# no std, and no default randomness source.
+[build]
+target = "thumbv7em-none-eabi"
+
+[target.thumbv7em-none-eabi]
+rustflags = ['--cfg', 'getrandom_backend="custom"']

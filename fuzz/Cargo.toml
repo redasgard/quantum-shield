@@ -1,0 +1,92 @@
+[package]
+name = "quantum-shield-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.quantum-shield]
+path = ".."
+features = ["pem", "serde"]
+
+# Prevent this crate from being pulled into the parent workspace.
+[workspace]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "envelope_from_bytes"
+path = "fuzz_targets/envelope_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "signature_from_bytes"
+path = "fuzz_targets/signature_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "public_bundle_from_bytes"
+path = "fuzz_targets/public_bundle_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "secret_from_bytes"
+path = "fuzz_targets/secret_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roundtrip_seal_open"
+path = "fuzz_targets/roundtrip_seal_open.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "roundtrip_sign_verify"
+path = "fuzz_targets/roundtrip_sign_verify.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "public_bundle_from_pem"
+path = "fuzz_targets/public_bundle_from_pem.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "multi_from_bytes"
+path = "fuzz_targets/multi_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "rotation_from_bytes"
+path = "fuzz_targets/rotation_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "stream_parse"
+path = "fuzz_targets/stream_parse.rs"
+test = false
+doc = false
+bench = false
