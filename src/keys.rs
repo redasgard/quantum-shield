@@ -20,7 +20,21 @@ use alloc::vec::Vec;
 use ml_dsa::signature::Keypair as _;
 use ml_dsa::{KeyExport as _, MlDsa87};
 use ml_kem::{DecapsulationKey1024, EncapsulationKey1024};
+use sha3::{Digest, Sha3_256};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+
+/// A short, stable identifier for a public-key bundle: the first
+/// [`KEY_ID_LEN`] bytes of `SHA3-256(QSP2 bytes)`. Useful for referencing or
+/// pinning a key (e.g. in a rotation record) without carrying the full bundle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct KeyId([u8; KEY_ID_LEN]);
+
+impl KeyId {
+    /// The raw identifier bytes.
+    pub fn as_bytes(&self) -> &[u8; KEY_ID_LEN] {
+        &self.0
+    }
+}
 
 /// The four private seeds, zeroized on drop.
 #[derive(Zeroize, ZeroizeOnDrop)]
@@ -160,6 +174,14 @@ impl PublicKeyBundle {
         out.extend_from_slice(&self.mldsa.encode());
         debug_assert_eq!(out.len(), PUBLIC_BUNDLE_LEN);
         out
+    }
+
+    /// This bundle's [`KeyId`] — `SHA3-256(self.to_bytes())[..16]`.
+    pub fn key_id(&self) -> KeyId {
+        let digest = Sha3_256::digest(self.to_bytes());
+        let mut id = [0u8; KEY_ID_LEN];
+        id.copy_from_slice(&digest[..KEY_ID_LEN]);
+        KeyId(id)
     }
 
     /// Parse and validate a v2 public-key bundle.

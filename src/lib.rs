@@ -65,6 +65,7 @@ mod multi;
 #[cfg(feature = "pem")]
 #[cfg_attr(docsrs, doc(cfg(feature = "pem")))]
 mod pem;
+mod rotate;
 mod seal;
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
@@ -77,8 +78,9 @@ mod wire;
 pub use api::HybridCrypto;
 pub use constants::*;
 pub use error::{Error, Result};
-pub use keys::{KeyPair, PublicKeyBundle};
+pub use keys::{KeyId, KeyPair, PublicKeyBundle};
 pub use multi::{open_multi, seal_multi, MultiRecipientEnvelope};
+pub use rotate::{verify_rotation, RotationAttestation};
 pub use seal::{open, seal};
 pub use stream::{StreamOpener, StreamSealer};
 pub use types::{Envelope, HybridSignature};
