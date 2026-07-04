@@ -1,10 +1,15 @@
-# Gap Matrix — quantum-shield v0.2.0 vs. production-grade
+# Gap Matrix — quantum-shield vs. production-grade
 
 Baseline: a general-purpose, production-grade hybrid post-quantum
-cryptography library. Status as of the v0.2.0 rewrite on branch
+cryptography library. Updated as of **v0.2.1** on branch
 `claude/crate-analysis-2gpwdm`.
 
 **Legend:** ✅ done · 🟡 partial · ❌ missing · ⬜ out of scope by design (v2)
+
+Gap-closing is staged across releases: **0.2.1** (assurance/tooling, done),
+**0.2.2** (hardening: no_std, constant-time, PKCS#8/PEM), **0.3.0** (features:
+multi-recipient, streaming, rotation). See the "Testing & QA" and
+"CI/supply chain" sections for what 0.2.1 already landed.
 
 ## 1. Cryptographic core
 
@@ -53,22 +58,23 @@ cryptography library. Status as of the v0.2.0 rewrite on branch
 | Adversarial: byte-flip, splice, downgrade, stripping | ✅ | `tests/tamper.rs`, `tests/downgrade.rs` |
 | Property-based tests | ✅ | `tests/proptests.rs` |
 | Wire-format golden / KAT vectors | ✅ | Self-generated (`tests/golden.rs`, `src/hybrid_kem.rs`) |
-| RFC 7748 / RFC 8032 sanity vectors | ❌ | Planned but not added; relies on dalek's own tests |
-| NIST ACVP vectors for ML-KEM/ML-DSA in-crate | ❌ | Relies on upstream crates' vectors |
-| Fuzzing (`cargo-fuzz`) of all parsers | ❌ | No fuzz targets for `from_bytes` paths |
-| Benchmarks (`criterion`) | ❌ | No real benchmarks (fabricated ones were removed) |
-| Coverage measurement | ❌ | Not wired into CI |
+| RFC 7748 / RFC 8032 sanity vectors | ✅ | `tests/kat_x25519.rs`, `tests/kat_ed25519.rs` (0.2.1) |
+| ML-KEM / ML-DSA in-crate vectors | 🟡 | `tests/kat_mlkem.rs`, `tests/kat_mldsa.rs` pin param-set/sizes/derivation (0.2.1); full ACVP conformance stays upstream |
+| Fuzzing (`cargo-fuzz`) of all parsers | ✅ | `fuzz/` — six targets, all `from_bytes` + roundtrips (0.2.1) |
+| Benchmarks (`criterion`) | ✅ | `benches/crypto.rs`, `benches/codec.rs` (0.2.1) |
+| Coverage measurement | ✅ | `cargo-llvm-cov` → Codecov CI job (0.2.1, non-gating) |
 
 ## 5. CI, supply chain & release
 
 | Capability | Status | Notes / gap |
 |---|---|---|
-| Multi-OS CI incl. macOS arm64 (Apple Silicon) | 🟡 | Workflow written; **not yet executed on GitHub** — the arm64 gate is unproven until it runs |
+| Multi-OS CI incl. macOS arm64 (Apple Silicon) | 🟡 | Workflow runs on `claude/**` pushes now; the arm64 job is green **once the push CI completes** (verify on GitHub) |
 | fmt + clippy (`-D warnings`) + doc | ✅ | `.github/workflows/ci.yml` |
 | MSRV (1.85) check | ✅ | Dedicated job |
 | `cargo-deny` (advisories/licenses/sources) | ✅ | `deny.toml` |
-| SemVer breakage check (`cargo-semver-checks`) | ❌ | Useful from 0.2.x onward |
+| SemVer breakage check (`cargo-semver-checks`) | ✅ | CI job vs. the 0.2.0 baseline commit (0.2.1) |
 | Signed releases / SLSA provenance / SBOM | ❌ | No supply-chain attestation |
+| Git tags for releases | 🟡 | Tags created locally; this environment's remote rejects tag pushes, so release refs are commit SHAs |
 | `cargo publish` dry-run passes | ✅ | Verified locally |
 
 ## 6. Docs, governance & assurance
@@ -82,11 +88,17 @@ cryptography library. Status as of the v0.2.0 rewrite on branch
 | Formal verification of the combiner/framing | ❌ | No machine-checked proof |
 | FIPS validation | ⬜ | Not attainable for a pure-Rust crate without a CAVP/CMVP program |
 
-## Highest-value gaps to close next
+## Remaining gaps (post-0.2.1)
 
-1. **Parser fuzzing** (`cargo-fuzz` over every `from_bytes`) — cheap, high assurance on attacker-controlled input.
-2. **Confirm the Apple Silicon CI gate actually runs green** — the requirement isn't met until a `macos-15` job passes.
-3. **RFC 7748 / 8032 + a handful of ML-KEM/ML-DSA ACVP vectors in-crate** — guards against a feature/wiring mistake that upstream tests wouldn't catch here.
-4. **Real `criterion` benchmarks** — replaces the deleted fabricated numbers with measured ones.
-5. **`cargo-semver-checks` in CI** — protects the now-stable API/wire format going forward.
-6. **Independent audit** — the one gap that external work, not code, must close before "production-grade" is fully honest.
+Closed in 0.2.1: parser fuzzing, RFC/ML-KEM/ML-DSA in-crate vectors, criterion
+benchmarks, coverage, and `cargo-semver-checks`. Still open:
+
+1. **Confirm the Apple Silicon CI gate is green** — CI now runs on this branch;
+   verify the `macos-15` job passed on GitHub (the requirement isn't met until
+   it does).
+2. **`no_std` support, constant-time harness, PKCS#8/PEM interop** — the 0.2.2
+   hardening milestone.
+3. **Multi-recipient, streaming, key rotation** — the 0.3.0 feature milestone.
+4. **Signed releases / SLSA / SBOM** — supply-chain attestation.
+5. **Independent audit** — the one gap that external work, not code, must close
+   before "production-grade" is fully honest.
