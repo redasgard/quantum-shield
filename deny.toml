@@ -4,6 +4,15 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+    # `atty` and `ansi_term` are *unmaintained* (not vulnerabilities). Both are
+    # pulled in only via clap 2 -> dudect-bencher, a dev-only dependency used by
+    # the manual constant-time harness (examples/dudect.rs); neither ships in the
+    # library or its runtime dependencies. Real vulnerability advisories still
+    # fail the gate.
+    "RUSTSEC-2024-0375", # atty unmaintained
+    "RUSTSEC-2021-0139", # ansi_term unmaintained
+]
 
 [licenses]
 version = 2
