@@ -142,6 +142,9 @@ jobs:
         with:
           tool: cargo-fuzz
       - name: Smoke-run each target
+        # The prebuilt cargo-fuzz is musl-linked and would otherwise default its
+        # build target to x86_64-unknown-linux-musl (whose std isn't installed);
+        # pin the gnu host target explicitly.
         run: |
           for t in envelope_from_bytes signature_from_bytes \
                    public_bundle_from_bytes secret_from_bytes \
@@ -149,6 +152,7 @@ jobs:
                    multi_from_bytes rotation_from_bytes stream_parse \
                    roundtrip_seal_open roundtrip_sign_verify; do
             echo "::group::$t"
-            cargo fuzz run "$t" -- -max_total_time=30 -print_final_stats=1
+            cargo fuzz run --target x86_64-unknown-linux-gnu "$t" \
+              -- -max_total_time=30 -print_final_stats=1
             echo "::endgroup::"
           done
