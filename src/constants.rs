@@ -25,6 +25,15 @@ pub const MAGIC_PUBLIC_BUNDLE: [u8; 4] = *b"QSP2";
 /// Magic prefix of a serialized secret-key bundle.
 pub const MAGIC_SECRET_BUNDLE: [u8; 4] = *b"QSK2";
 
+/// Magic prefix of a serialized multi-recipient envelope.
+pub const MAGIC_MULTI: [u8; 4] = *b"QSM2";
+
+/// Magic prefix of a serialized streaming header.
+pub const MAGIC_STREAM: [u8; 4] = *b"QST2";
+
+/// Magic prefix of a serialized rotation attestation.
+pub const MAGIC_ROTATION: [u8; 4] = *b"QSR2";
+
 /// X25519 public key length in bytes.
 pub const X25519_PK_LEN: usize = 32;
 
@@ -86,6 +95,32 @@ pub const SECRET_BUNDLE_LEN: usize =
 /// Maximum plaintext length accepted by [`seal`](crate::seal) (64 MiB).
 pub const MAX_PLAINTEXT_LEN: usize = 64 * 1024 * 1024;
 
+/// Content-encryption key length for multi-recipient envelopes (bytes).
+pub const CEK_LEN: usize = 32;
+
+/// Per-recipient wrap length in a multi-recipient envelope: ephemeral X25519
+/// key + ML-KEM ciphertext + wrap nonce + wrapped CEK (CEK + AEAD tag).
+pub const WRAP_LEN: usize = X25519_PK_LEN + MLKEM1024_CT_LEN + NONCE_LEN + CEK_LEN + TAG_LEN;
+
+/// Maximum recipients per multi-recipient envelope (DoS bound; enforced at
+/// both seal and parse time, since `open` trial-decrypts every wrap).
+pub const MAX_RECIPIENTS: usize = 1024;
+
+/// Plaintext bytes per chunk in a streaming envelope (64 KiB).
+pub const STREAM_CHUNK_SIZE: usize = 64 * 1024;
+
+/// Length of the random nonce prefix in a streaming envelope. The 12-byte
+/// AES-GCM nonce is `prefix (7) || u32 chunk counter (4) || last-flag (1)`.
+pub const STREAM_NONCE_PREFIX_LEN: usize = 7;
+
+/// Length of a streaming header: header + ephemeral X25519 key + ML-KEM
+/// ciphertext + nonce prefix.
+pub const STREAM_HEADER_LEN: usize =
+    HEADER_LEN + X25519_PK_LEN + MLKEM1024_CT_LEN + STREAM_NONCE_PREFIX_LEN;
+
+/// Length of a truncated key identifier (`SHA3-256(QSP2)[..16]`).
+pub const KEY_ID_LEN: usize = 16;
+
 /// Maximum signing/verification context length in bytes (mirrors the FIPS 204
 /// context-string limit).
 pub const MAX_CONTEXT_LEN: usize = 255;
@@ -95,3 +130,6 @@ pub(crate) const KEM_COMBINER_LABEL: &[u8] = b"quantum-shield/v2/kem:X25519+ML-K
 
 /// Domain-separation label prepended to every signed message.
 pub(crate) const SIG_DOMAIN_LABEL: &[u8] = b"quantum-shield/v2/sig:Ed25519+ML-DSA-87\0";
+
+/// Signing context for rotation attestations.
+pub const ROTATION_CONTEXT: &[u8] = b"quantum-shield/v2/rotate\0";

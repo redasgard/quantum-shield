@@ -61,6 +61,7 @@ mod constants;
 mod error;
 mod hybrid_kem;
 mod keys;
+mod multi;
 #[cfg(feature = "pem")]
 #[cfg_attr(docsrs, doc(cfg(feature = "pem")))]
 mod pem;
@@ -76,6 +77,7 @@ pub use api::HybridCrypto;
 pub use constants::*;
 pub use error::{Error, Result};
 pub use keys::{KeyPair, PublicKeyBundle};
+pub use multi::{open_multi, seal_multi, MultiRecipientEnvelope};
 pub use seal::{open, seal};
 pub use types::{Envelope, HybridSignature};
 pub use zeroize::Zeroizing;

@@ -63,4 +63,25 @@ pub enum Error {
     /// The operating system's secure random number generator failed.
     #[error("operating system randomness unavailable")]
     RandomnessUnavailable,
+
+    /// A multi-recipient envelope was requested with no recipients.
+    #[error("no recipients")]
+    NoRecipients,
+
+    /// A multi-recipient envelope exceeds [`MAX_RECIPIENTS`](crate::MAX_RECIPIENTS).
+    #[error("too many recipients: {count} exceeds the {max} limit")]
+    TooManyRecipients {
+        /// The rejected recipient count.
+        count: usize,
+        /// The enforced limit.
+        max: usize,
+    },
+
+    /// A streaming chunk was submitted after the final chunk.
+    #[error("stream already finished")]
+    StreamFinished,
+
+    /// A stream ended without a final chunk (possible truncation).
+    #[error("stream truncated")]
+    StreamTruncated,
 }

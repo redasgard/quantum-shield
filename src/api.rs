@@ -2,6 +2,7 @@
 
 use crate::error::Result;
 use crate::keys::{KeyPair, PublicKeyBundle};
+use crate::multi::MultiRecipientEnvelope;
 use crate::types::{Envelope, HybridSignature};
 use alloc::vec::Vec;
 use zeroize::Zeroizing;
@@ -87,6 +88,18 @@ impl HybridCrypto {
     /// any cryptographic failure, with no further detail by design.
     pub fn open(&self, envelope: &Envelope) -> Result<Vec<u8>> {
         crate::seal::open(&self.keypair, envelope)
+    }
+
+    /// Decrypt a [`MultiRecipientEnvelope`] if this keypair is a recipient.
+    ///
+    /// Equivalent to [`crate::open_multi`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::DecryptionFailed`](crate::Error::DecryptionFailed) if
+    /// this keypair is not a recipient or the envelope was tampered with.
+    pub fn open_multi(&self, envelope: &MultiRecipientEnvelope) -> Result<Vec<u8>> {
+        crate::multi::open_multi(&self.keypair, envelope)
     }
 
     /// Sign `message` under an application `context` (0–255 bytes) with both
