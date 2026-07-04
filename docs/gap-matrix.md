@@ -6,10 +6,11 @@ cryptography library. Updated as of **v0.2.1** on branch
 
 **Legend:** ✅ done · 🟡 partial · ❌ missing · ⬜ out of scope by design (v2)
 
-Gap-closing is staged across releases: **0.2.1** (assurance/tooling, done),
-**0.2.2** (hardening: no_std, constant-time, PKCS#8/PEM, done), **0.3.0**
-(features: multi-recipient, streaming, rotation — next). The section tables
-mark which release landed each item.
+Gap-closing shipped across releases: **0.2.1** (assurance/tooling),
+**0.2.2** (hardening: no_std, constant-time, PKCS#8/PEM), **0.3.0**
+(features: multi-recipient, streaming, rotation). The section tables mark
+which release landed each item. The remaining open items are external
+(audit, supply-chain attestation) — see the end.
 
 ## 1. Cryptographic core
 
@@ -22,9 +23,10 @@ mark which release landed each item.
 | Domain separation + injective framing | ✅ | Labels + length-prefixed context |
 | Combiner is standard X-Wing (ML-KEM-768) | 🟡 | Deliberately adapted to ML-KEM-1024; not the ratified draft. No formal proof for the ported construction |
 | Randomized ("hedged") ML-DSA signing | ❌ | Deterministic only; `ml-dsa` 0.1 doesn't expose hedged path |
-| Multi-recipient encryption | ⬜ | One envelope → one recipient in v2 |
-| Streaming / chunked AEAD for >64 MiB | ⬜ | Single-shot, 64 MiB cap |
-| Forward secrecy for recipient (ratchet/rotation) | ⬜ | Static recipient KEM keys; documented in security model |
+| Multi-recipient encryption | ✅ | `seal_multi`/`open_multi` (`QSM2`), recipient set bound into payload (0.3.0) |
+| Streaming / chunked AEAD for >64 MiB | ✅ | `StreamSealer`/`StreamOpener` (`QST2`), STREAM construction (0.3.0) |
+| Key rotation (signed old→new attestation) | ✅ | `key_id` + `RotationAttestation` (`QSR2`) (0.3.0) |
+| Forward secrecy for recipient (ratchet) | ⬜ | Static recipient KEM keys; rotation gives bounded-exposure re-keying, not per-message FS |
 | Authenticated sender (signcryption) | ⬜ | `seal` is anonymous by design |
 
 ## 2. Side-channel & memory hardening
@@ -93,12 +95,15 @@ mark which release landed each item.
 Closed in 0.2.1: parser fuzzing, RFC/ML-KEM/ML-DSA in-crate vectors, criterion
 benchmarks, coverage, `cargo-semver-checks`. Closed in 0.2.2: `no_std`+`alloc`
 (bare-metal CI gate), dudect constant-time regression harness, PKCS#8/PEM
-public-key interop. Still open:
+public-key interop. Closed in 0.3.0: multi-recipient envelopes, streaming
+AEAD, key rotation. Still open:
 
-1. **Confirm the Apple Silicon CI gate is green** — CI now runs on this branch;
+1. **Confirm the Apple Silicon CI gate is green** — CI runs on this branch;
    verify the `macos-15` job passed on GitHub (the requirement isn't met until
    it does).
-2. **Multi-recipient, streaming, key rotation** — the 0.3.0 feature milestone.
-3. **Signed releases / SLSA / SBOM** — supply-chain attestation.
-4. **Independent audit** — the one gap that external work, not code, must close
+2. **Signed releases / SLSA / SBOM** — supply-chain attestation.
+3. **Independent audit** — the one gap that external work, not code, must close
    before "production-grade" is fully honest.
+
+The code-level gaps from the original matrix are now closed; what remains is
+external assurance (audit) and release-infrastructure (attestation) work.

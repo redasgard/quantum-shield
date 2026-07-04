@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-04
+
+New capabilities. All additive — the single-recipient `Envelope` (`QSE2`),
+signatures, and keys are unchanged, and existing code keeps working. New
+wire objects use new magics (`QSM2`/`QST2`/`QSR2`) and keep `version = 2`,
+`suite = 1`.
+
+### Added
+
+- **Multi-recipient envelopes** (`QSM2`): `seal_multi` / `open_multi` /
+  `MultiRecipientEnvelope`. One payload under a random CEK; the CEK is wrapped
+  per recipient with a full hybrid KEM. The payload authentication binds the
+  entire recipient set, so add/remove/reorder/duplicate tampering fails.
+  Opening trial-decrypts with no recipient identifier on the wire;
+  `MAX_RECIPIENTS = 1024` bounds the cost.
+- **Streaming AEAD** (`QST2`): `StreamSealer` / `StreamOpener` for payloads
+  over `MAX_PLAINTEXT_LEN`. One hybrid KEM keys a STREAM of 64 KiB chunks;
+  each chunk binds its index and a last-flag, so reorder/duplicate/drop/
+  truncate all fail (`StreamTruncated` at `finish`).
+- **Key rotation** (`QSR2`): `PublicKeyBundle::key_id` (`SHA3-256(QSP2)[..16]`)
+  and `RotationAttestation` — the old keypair hybrid-signs `old_key_id ||
+  new_public`, giving verifiers a cryptographic old→new link
+  (`HybridCrypto::attest_rotation`, `verify_rotation`).
+- New parser fuzz targets, normative `docs/design.md` sections for all three
+  formats, and golden vectors (`key_id`, deterministic rotation attestation).
+- New `Error` variants (`NoRecipients`, `TooManyRecipients`, `StreamFinished`,
+  `StreamTruncated`); the enum is `#[non_exhaustive]`, so this is non-breaking.
+
 ## [0.2.2] - 2026-07-04
 
 Hardening. `std` remains a default feature, so existing users are unaffected;

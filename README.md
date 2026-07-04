@@ -128,6 +128,19 @@ threat model in [docs/security-model.md](docs/security-model.md).
 | Public key bundle | 4230 bytes |
 | Secret key bundle (seeds) | 166 bytes |
 
+Beyond single-recipient `seal`/`open`, the crate also provides:
+
+- **Multi-recipient** — `seal_multi(payload, &[&bundle, …])` / `open_multi`:
+  one payload to many recipients, the recipient set bound into the payload
+  authentication.
+- **Streaming** — `StreamSealer` / `StreamOpener`: chunked AEAD for payloads
+  larger than the 64 MiB single-shot limit.
+- **Key rotation** — `PublicKeyBundle::key_id` and `attest_rotation` /
+  `verify_rotation`: a hybrid-signed old→new link so peers can follow a key
+  change from a trusted anchor.
+
+All are specified in [docs/design.md](docs/design.md).
+
 ## Features
 
 - `std` (on by default): standard-library integration. Disable it for a

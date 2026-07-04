@@ -6,20 +6,25 @@
 //! changed and the format version must be bumped — do not just update the
 //! pinned values.
 
-use quantum_shield::{verify, Envelope, HybridCrypto};
+use quantum_shield::{verify, verify_rotation, Envelope, HybridCrypto};
 use sha3::{Digest, Sha3_256};
 
-/// The fixed test keypair: QSK2 bundle with seeds 0x01/0x02/0x03/0x04.
-fn fixed_keypair() -> HybridCrypto {
+/// A fixed test keypair from a QSK2 bundle with the given seed byte.
+fn fixed_keypair_with(seed: u8) -> HybridCrypto {
     let mut secret = Vec::new();
     secret.extend_from_slice(b"QSK2");
     secret.push(2); // version
     secret.push(1); // suite
-    secret.extend_from_slice(&[0x01; 32]); // x25519
-    secret.extend_from_slice(&[0x02; 64]); // ml-kem seed
-    secret.extend_from_slice(&[0x03; 32]); // ed25519 seed
-    secret.extend_from_slice(&[0x04; 32]); // ml-dsa seed
+    secret.extend_from_slice(&[seed; 32]); // x25519
+    secret.extend_from_slice(&[seed.wrapping_add(1); 64]); // ml-kem seed
+    secret.extend_from_slice(&[seed.wrapping_add(2); 32]); // ed25519 seed
+    secret.extend_from_slice(&[seed.wrapping_add(3); 32]); // ml-dsa seed
     HybridCrypto::from_secret_bytes(&secret).unwrap()
+}
+
+/// The primary fixed keypair (seeds 0x01/0x02/0x03/0x04).
+fn fixed_keypair() -> HybridCrypto {
+    fixed_keypair_with(0x01)
 }
 
 #[test]
@@ -65,5 +70,37 @@ fn stored_envelope_still_opens() {
     assert_eq!(
         kp.open(&envelope).unwrap(),
         b"quantum-shield v2 golden envelope"
+    );
+}
+
+#[test]
+fn key_id_is_stable() {
+    let kp = fixed_keypair();
+    assert_eq!(
+        hex::encode(kp.public_keys().key_id().as_bytes()),
+        "2e2a8ceec37f7e0b8b68ed88fe9de857"
+    );
+}
+
+/// Rotation attestations are fully deterministic (deterministic hybrid
+/// signing), so a fixed old→new rotation pins to an exact byte string.
+#[test]
+fn rotation_attestation_is_stable() {
+    let old = fixed_keypair_with(0x01);
+    let new = fixed_keypair_with(0x10);
+    let att = old.attest_rotation(new.public_keys()).unwrap();
+
+    // Deterministic: same inputs, same attestation.
+    let att2 = old.attest_rotation(new.public_keys()).unwrap();
+    assert_eq!(att, att2);
+
+    assert_eq!(
+        hex::encode(Sha3_256::digest(att.to_bytes())),
+        "78ca42eab5b156277c35d0484c4cee76ee54705fda25194510c05ddb1c2e32fe"
+    );
+    // And it still verifies.
+    assert_eq!(
+        verify_rotation(old.public_keys(), &att).unwrap(),
+        new.public_keys()
     );
 }

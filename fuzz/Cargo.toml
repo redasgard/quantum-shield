@@ -69,3 +69,24 @@ path = "fuzz_targets/public_bundle_from_pem.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "multi_from_bytes"
+path = "fuzz_targets/multi_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "rotation_from_bytes"
+path = "fuzz_targets/rotation_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "stream_parse"
+path = "fuzz_targets/stream_parse.rs"
+test = false
+doc = false
+bench = false
