@@ -16,7 +16,7 @@ ml-kem = { version = "0.3.2", default-features = false, features = ["alloc", "ze
 ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc", "zeroize"] }
 x25519-dalek = { version = "2.0.1", default-features = false, features = ["static_secrets", "zeroize"] }
 ed25519-dalek = { version = "2.2.0", default-features = false, features = ["alloc", "fast", "zeroize"] }
-aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc"] }
+aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc", "zeroize"] }
 sha3 = { version = "0.12", default-features = false }
 getrandom = "0.4"
 zeroize = { version = "1.8", default-features = false, features = ["derive", "alloc"] }

@@ -54,7 +54,12 @@ mod serde_bytes_shim {
                 }
 
                 fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<ByteBuf, A::Error> {
-                    let mut out = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+                    // Cap the pre-allocation: `size_hint` is attacker-controlled
+                    // for self-describing binary formats (bincode/CBOR), so a
+                    // tiny blob could otherwise request a huge up-front alloc.
+                    // The Vec still grows as elements arrive.
+                    let hint = seq.size_hint().unwrap_or(0).min(64 * 1024);
+                    let mut out = Vec::with_capacity(hint);
                     while let Some(b) = seq.next_element::<u8>()? {
                         out.push(b);
                     }

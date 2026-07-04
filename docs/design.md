@@ -137,29 +137,42 @@ zeroize seed material on drop and treat the bundle as highly sensitive.
 Encrypts one payload to N recipients (1 ≤ N ≤ 1024).
 
 ```text
-header[6] || recipient_count: u16_be || wrap[0..N] || payload_nonce[12] || payload_ct[..]
+header[6] || recipient_count: u16_be || cek_commitment[32]
+          || wrap[0..N] || payload_nonce[12] || payload_ct[..]
 wrap = epk_x25519[32] || ct_mlkem[1568] || wrap_nonce[12] || wrapped_cek[48]
 ```
 
 Construction:
 
 1. Draw a random 32-byte content-encryption key (CEK).
-2. For each recipient, run the hybrid KEM (as above) to a shared secret `ss_i`,
+2. Compute `cek_commitment = SHA3-256("quantum-shield/v2/multi:cek-commit\0" || CEK)`.
+3. For each recipient, run the hybrid KEM (as above) to a shared secret `ss_i`,
    then AES-256-GCM-encrypt the CEK under `ss_i` with `wrap_nonce` and
    `aad = header || recipient_count`. The 48-byte result is `wrapped_cek`
    (32-byte CEK + 16-byte tag).
-3. AES-256-GCM-encrypt the payload under the CEK with `payload_nonce` and
-   `aad = the entire prefix` (header, count, **all** wrap records, and
-   `payload_nonce`).
+4. AES-256-GCM-encrypt the payload under the CEK with `payload_nonce` and
+   `aad = the entire prefix` (header, count, commitment, **all** wrap records,
+   and `payload_nonce`).
 
 The payload AAD binds the full recipient set, so adding, removing, reordering,
 or duplicating any wrap fails authentication. Decryption trial-decrypts every
-wrap — there is **no** per-recipient identifier on the wire — and reports a
-single uniform failure. Implementations must reject `recipient_count == 0`,
-`recipient_count > 1024`, and a byte length inconsistent with the count.
+wrap — there is **no** per-recipient identifier on the wire — and, after
+recovering a CEK, **must** check `SHA3-256(label || CEK) == cek_commitment`
+(constant-time) before using it; a mismatch is a uniform failure. Implementations
+must reject `recipient_count == 0`, `recipient_count > 1024`, and a byte length
+inconsistent with the count.
 
-Security note: this is KEM-DEM, not the v0.1.x OR-flaw — every wrap is a full
+Security notes: this is KEM-DEM, not the v0.1.x OR-flaw — every wrap is a full
 hybrid KEM and the CEK is random, so no single broken key reveals the payload.
+The commitment closes an equivocation gap: because AES-GCM is not key-committing,
+without it a malicious sender could wrap *different* CEKs to different recipients
+and craft one payload that decrypts to different plaintexts for each. Requiring
+every recipient to match the single committed CEK prevents that.
+
+DoS note: because there is no recipient identifier, `open` trial-decrypts every
+wrap, so an unauthenticated attacker can force up to `recipient_count` hybrid
+decapsulations per message. `MAX_RECIPIENTS = 1024` bounds this; callers who
+process untrusted envelopes should rate-limit accordingly.
 
 ## Streaming envelope (`QST2`)
 
@@ -190,23 +203,29 @@ finalization. Binding the index and last-flag into both the nonce and the AAD
 makes reordering, duplication, dropping, and truncation fail. Implementations
 must reject a `u32` counter overflow (2^32 chunks = 256 TiB).
 
-## Rotation attestation (`QSR2`, fixed 8933 bytes)
+## Rotation attestation (`QSR2`, fixed 8941 bytes)
 
 ```text
-header[6] || new_public (QSP2, 4230) || signature (QSS2, 4697)
+header[6] || epoch: u64_be || new_public (QSP2, 4230) || signature (QSS2, 4697)
 ```
 
 `key_id(bundle) = SHA3-256(bundle_QSP2_bytes)[..16]`. An attestation is the
 **old** keypair's hybrid signature over
 
 ```text
-old_key_id (16) || new_public_QSP2 (4230)
+old_key_id (16) || epoch (8) || new_public_QSP2 (4230)
 ```
 
 under the signing context `"quantum-shield/v2/rotate\0"`. The old bundle is
 not on the wire: a verifier supplies the trusted old key, recomputes the
 message, and checks the signature (both Ed25519 and ML-DSA-87). Success proves
-the trusted old key authorized `new_public`.
+the trusted old key authorized `new_public` at `epoch`.
+
+Rollback: attestations do not expire, so a verifier that trusts `old` must
+remember the highest `epoch` it has accepted for `old` and reject any
+attestation whose epoch does not strictly advance; otherwise a captured,
+superseded attestation could roll it back to an old successor. The library is
+stateless and cannot enforce this — it only binds and exposes the epoch.
 
 ## Stability
 

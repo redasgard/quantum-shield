@@ -112,9 +112,12 @@ impl HybridCrypto {
         crate::StreamOpener::new(&self.keypair, header)
     }
 
-    /// Sign `new_public` as this keypair's authorized successor, producing a
-    /// [`RotationAttestation`](crate::RotationAttestation) that anyone trusting
-    /// this keypair can verify with [`crate::verify_rotation`].
+    /// Sign `new_public` as this keypair's authorized successor at `epoch`,
+    /// producing a [`RotationAttestation`](crate::RotationAttestation) that
+    /// anyone trusting this keypair can verify with [`crate::verify_rotation`].
+    ///
+    /// Use a strictly increasing `epoch` across successive rotations so that
+    /// verifiers can reject rolled-back attestations.
     ///
     /// # Errors
     ///
@@ -122,8 +125,9 @@ impl HybridCrypto {
     pub fn attest_rotation(
         &self,
         new_public: &PublicKeyBundle,
+        epoch: u64,
     ) -> Result<crate::RotationAttestation> {
-        crate::rotate::attest_rotation(&self.keypair, new_public)
+        crate::rotate::attest_rotation(&self.keypair, new_public, epoch)
     }
 
     /// Sign `message` under an application `context` (0–255 bytes) with both

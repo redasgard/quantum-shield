@@ -12,10 +12,15 @@
 //! - Each wrap's AEAD binds `header || recipient_count` as associated data,
 //!   so a wrap cannot be lifted into an envelope with a different recipient
 //!   count or format.
-//! - The payload AEAD binds the **entire prefix** (header, count, *all* wraps,
-//!   and the payload nonce). Adding, removing, reordering, or duplicating any
-//!   wrap changes the payload tag, so tampering fails as a uniform
-//!   [`Error::DecryptionFailed`].
+//! - The payload AEAD binds the **entire prefix** (header, count, the CEK
+//!   commitment, *all* wraps, and the payload nonce). Adding, removing,
+//!   reordering, or duplicating any wrap changes the payload tag, so tampering
+//!   fails as a uniform [`Error::DecryptionFailed`].
+//! - A `SHA3-256(CEK)` commitment is carried in the envelope and checked by
+//!   every recipient against the CEK they recovered. AES-GCM is not
+//!   key-committing, so without this a malicious sender could wrap *different*
+//!   CEKs to different recipients and craft one payload that decrypts to
+//!   different plaintexts per recipient; the commitment forecloses that.
 //!
 //! ## Opening
 //!
@@ -33,7 +38,20 @@ use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use sha3::{Digest, Sha3_256};
+use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
+
+/// Commit to a CEK: `SHA3-256(label || cek)`. Recipients check that the CEK
+/// they recovered matches the single committed value, which stops a malicious
+/// sender from wrapping different CEKs to different recipients (AES-GCM is not
+/// key-committing).
+fn cek_commitment(cek: &[u8; CEK_LEN]) -> [u8; CEK_COMMIT_LEN] {
+    let mut hasher = Sha3_256::new();
+    hasher.update(MULTI_CEK_COMMIT_LABEL);
+    hasher.update(cek);
+    hasher.finalize().into()
+}
 
 /// A CEK wrapped for one recipient.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,6 +72,9 @@ struct Wrap {
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MultiRecipientEnvelope {
+    /// `SHA3-256(label || CEK)` — every recipient checks their recovered CEK
+    /// against this, preventing sender equivocation.
+    cek_commitment: [u8; CEK_COMMIT_LEN],
     wraps: Vec<Wrap>,
     payload_nonce: [u8; NONCE_LEN],
     payload_ct: Vec<u8>,
@@ -68,8 +89,10 @@ impl MultiRecipientEnvelope {
     /// The authenticated prefix (header through payload nonce), used as the
     /// payload AEAD associated data.
     fn write_prefix(&self, out: &mut Vec<u8>) {
+        debug_assert!(self.wraps.len() <= MAX_RECIPIENTS);
         write_header(out, MAGIC_MULTI);
         out.extend_from_slice(&(self.wraps.len() as u16).to_be_bytes());
+        out.extend_from_slice(&self.cek_commitment);
         for wrap in &self.wraps {
             out.extend_from_slice(&wrap.epk_x25519);
             out.extend_from_slice(wrap.ct_mlkem.as_ref());
@@ -82,7 +105,12 @@ impl MultiRecipientEnvelope {
     /// Serialize to the `QSM2` wire format.
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(
-            HEADER_LEN + 2 + self.wraps.len() * WRAP_LEN + NONCE_LEN + self.payload_ct.len(),
+            HEADER_LEN
+                + 2
+                + CEK_COMMIT_LEN
+                + self.wraps.len() * WRAP_LEN
+                + NONCE_LEN
+                + self.payload_ct.len(),
         );
         self.write_prefix(&mut out);
         out.extend_from_slice(&self.payload_ct);
@@ -111,6 +139,8 @@ impl MultiRecipientEnvelope {
             });
         }
 
+        let cek_commitment = take(&mut rest, Error::InvalidEnvelope)?;
+
         let mut wraps = Vec::with_capacity(count);
         for _ in 0..count {
             let epk_x25519 = take(&mut rest, Error::InvalidEnvelope)?;
@@ -130,6 +160,7 @@ impl MultiRecipientEnvelope {
             return Err(Error::InvalidEnvelope);
         }
         Ok(Self {
+            cek_commitment,
             wraps,
             payload_nonce,
             payload_ct: rest.to_vec(),
@@ -208,6 +239,7 @@ pub fn seal_multi(
     getrandom::fill(&mut payload_nonce).map_err(|_| Error::RandomnessUnavailable)?;
 
     let mut envelope = MultiRecipientEnvelope {
+        cek_commitment: cek_commitment(&cek),
         wraps,
         payload_nonce,
         payload_ct: Vec::new(),
@@ -265,6 +297,14 @@ pub fn open_multi(keypair: &KeyPair, envelope: &MultiRecipientEnvelope) -> Resul
                 .try_into()
                 .map_err(|_| Error::DecryptionFailed)?,
         );
+
+        // Reject a sender who wrapped a different CEK than it committed to
+        // (equivocation). Constant-time compare against the single commitment.
+        let commit_ok: bool = cek_commitment(&cek).ct_eq(&envelope.cek_commitment).into();
+        if !commit_ok {
+            return Err(Error::DecryptionFailed);
+        }
+
         let payload_cipher = Aes256Gcm::new((&*cek).into());
         return payload_cipher
             .decrypt(

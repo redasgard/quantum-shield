@@ -88,15 +88,15 @@ fn key_id_is_stable() {
 fn rotation_attestation_is_stable() {
     let old = fixed_keypair_with(0x01);
     let new = fixed_keypair_with(0x10);
-    let att = old.attest_rotation(new.public_keys()).unwrap();
+    let att = old.attest_rotation(new.public_keys(), 1).unwrap();
 
     // Deterministic: same inputs, same attestation.
-    let att2 = old.attest_rotation(new.public_keys()).unwrap();
+    let att2 = old.attest_rotation(new.public_keys(), 1).unwrap();
     assert_eq!(att, att2);
 
     assert_eq!(
         hex::encode(Sha3_256::digest(att.to_bytes())),
-        "78ca42eab5b156277c35d0484c4cee76ee54705fda25194510c05ddb1c2e32fe"
+        "43fdb87805c2ce3caed21def1ff89d0eedc00d7c814be0cca243d80293343ddf"
     );
     // And it still verifies.
     assert_eq!(

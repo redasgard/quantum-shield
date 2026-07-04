@@ -184,13 +184,20 @@ impl PublicKeyBundle {
         KeyId(id)
     }
 
-    /// Parse and validate a v2 public-key bundle.
+    /// Parse a v2 public-key bundle, validating the length and the components
+    /// that support validation.
+    ///
+    /// The X25519, ML-KEM-1024, and Ed25519 components are checked (a
+    /// non-canonical Ed25519 point or an out-of-range ML-KEM key is rejected).
+    /// ML-DSA-87 verifying keys have no upstream validation and are only
+    /// length-checked; a structurally-invalid one simply fails verification
+    /// later. X25519 has no point validation by design (every 32-byte string is
+    /// a valid u-coordinate).
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidKey`] if the encoding is malformed or any
-    /// component fails validation (e.g. a non-canonical Ed25519 point or an
-    /// out-of-range ML-KEM key).
+    /// Returns [`Error::InvalidKey`] if the encoding is malformed or a
+    /// validatable component fails validation.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let mut rest = read_header(bytes, MAGIC_PUBLIC_BUNDLE, Error::InvalidKey)?;
 

@@ -106,12 +106,28 @@ impl StreamSealer {
     ///
     /// # Errors
     ///
-    /// [`Error::StreamFinished`] if called after a `last` chunk or past the
-    /// 2^32-chunk limit.
+    /// [`Error::StreamFinished`] if called after a `last` chunk or once the
+    /// 2^32-chunk limit is reached; [`Error::MessageTooLarge`] if a single
+    /// chunk's ciphertext would exceed the 32-bit frame length.
     pub fn seal_chunk(&mut self, plaintext: &[u8], last: bool) -> Result<Vec<u8>> {
         if self.finished {
             return Err(Error::StreamFinished);
         }
+        // Refuse a non-final chunk at the maximum index *before* encrypting, so
+        // the next call can never reuse the index/nonce. (A final chunk at the
+        // maximum index is fine — the stream ends there.)
+        if !last && self.index == u32::MAX {
+            self.finished = true;
+            return Err(Error::StreamFinished);
+        }
+        // Bound the per-chunk ciphertext to the 32-bit frame length field.
+        if plaintext.len() > (u32::MAX as usize - TAG_LEN) {
+            return Err(Error::MessageTooLarge {
+                len: plaintext.len(),
+                max: u32::MAX as usize - TAG_LEN,
+            });
+        }
+
         let nonce = chunk_nonce(&self.nonce_prefix, self.index, last);
         let aad = chunk_aad(&self.header, self.index, last);
         let ct = self
@@ -123,7 +139,10 @@ impl StreamSealer {
                     aad: &aad,
                 },
             )
-            .map_err(|_| Error::StreamFinished)?;
+            .map_err(|_| Error::MessageTooLarge {
+                len: plaintext.len(),
+                max: u32::MAX as usize - TAG_LEN,
+            })?;
 
         // Frame: last(1) || u32_be ct_len || ct.
         let mut frame = Vec::with_capacity(5 + ct.len());
@@ -134,13 +153,22 @@ impl StreamSealer {
         if last {
             self.finished = true;
         } else {
-            self.index = self.index.checked_add(1).ok_or(Error::StreamFinished)?;
+            // Safe: guarded above that index < u32::MAX for non-final chunks.
+            self.index += 1;
         }
         Ok(frame)
     }
 }
 
 /// Decrypts a stream produced by [`StreamSealer`], one chunk at a time.
+///
+/// **You must call [`finish`](StreamOpener::finish) after the last chunk.**
+/// Per-chunk authentication catches reordering, duplication, and corruption,
+/// but *truncation* — an attacker dropping the trailing chunks, including the
+/// final one — is only detected by `finish`, which fails with
+/// [`Error::StreamTruncated`] if it never saw a chunk marked `last`. A consumer
+/// that just loops `open_chunk` until its input is exhausted and skips `finish`
+/// will silently accept a truncated stream.
 pub struct StreamOpener {
     cipher: Aes256Gcm,
     nonce_prefix: [u8; STREAM_NONCE_PREFIX_LEN],

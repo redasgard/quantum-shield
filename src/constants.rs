@@ -98,6 +98,9 @@ pub const MAX_PLAINTEXT_LEN: usize = 64 * 1024 * 1024;
 /// Content-encryption key length for multi-recipient envelopes (bytes).
 pub const CEK_LEN: usize = 32;
 
+/// Length of the CEK commitment in a multi-recipient envelope (bytes).
+pub const CEK_COMMIT_LEN: usize = 32;
+
 /// Per-recipient wrap length in a multi-recipient envelope: ephemeral X25519
 /// key + ML-KEM ciphertext + wrap nonce + wrapped CEK (CEK + AEAD tag).
 pub const WRAP_LEN: usize = X25519_PK_LEN + MLKEM1024_CT_LEN + NONCE_LEN + CEK_LEN + TAG_LEN;
@@ -133,3 +136,6 @@ pub(crate) const SIG_DOMAIN_LABEL: &[u8] = b"quantum-shield/v2/sig:Ed25519+ML-DS
 
 /// Signing context for rotation attestations.
 pub const ROTATION_CONTEXT: &[u8] = b"quantum-shield/v2/rotate\0";
+
+/// Domain label for the multi-recipient CEK commitment.
+pub(crate) const MULTI_CEK_COMMIT_LABEL: &[u8] = b"quantum-shield/v2/multi:cek-commit\0";

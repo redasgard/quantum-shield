@@ -4,6 +4,10 @@ on:
   push:
     branches: [main, "claude/**"]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    # Weekly, for the non-gating constant-time job.
+    - cron: "0 6 * * 1"
 
 env:
   CARGO_TERM_COLOR: always
@@ -139,8 +143,10 @@ jobs:
         run: |
           for t in envelope_from_bytes signature_from_bytes \
                    public_bundle_from_bytes secret_from_bytes \
+                   public_bundle_from_pem \
+                   multi_from_bytes rotation_from_bytes stream_parse \
                    roundtrip_seal_open roundtrip_sign_verify; do
             echo "::group::$t"
-            cargo fuzz run "$t" -- -max_total_time=45 -print_final_stats=1
+            cargo fuzz run "$t" -- -max_total_time=30 -print_final_stats=1
             echo "::endgroup::"
           done

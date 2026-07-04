@@ -66,9 +66,22 @@ holds.
   static. Compromise of a recipient's secret bundle decrypts all past
   envelopes addressed to it. Rotate keys if you need bounded exposure.
 - **Denial of service**: parsing enforces sizes, but callers must still
-  bound how many envelopes/signatures they process.
-- **Multi-recipient / streaming**: out of scope in v2; one envelope, one
-  recipient, one contiguous payload up to 64 MiB.
+  bound how many envelopes/signatures they process. Note that opening a
+  multi-recipient envelope trial-decrypts every wrap (no recipient identifier
+  is on the wire, for privacy), so an attacker can force up to
+  `MAX_RECIPIENTS` (1024) hybrid decapsulations per message — rate-limit
+  untrusted multi-recipient input.
+- **Multi-recipient equivocation** is *addressed*: `QSM2` binds `SHA3-256(CEK)`
+  as a commitment and every recipient checks it, so a malicious sender cannot
+  deliver different plaintexts to different recipients (AES-GCM alone is not
+  key-committing).
+- **Rotation rollback**: a `RotationAttestation` never expires. It binds a
+  caller-supplied monotonic `epoch`, but the library is stateless — a verifier
+  **must** track the highest epoch accepted per signer and reject non-advancing
+  ones, or a captured superseded attestation can roll it back.
+- **Stream truncation** is only caught if the reader calls
+  `StreamOpener::finish()`; a reader that drops the opener without finishing
+  will accept a truncated stream.
 
 ## Operational guidance
 

@@ -33,6 +33,25 @@ wire objects use new magics (`QSM2`/`QST2`/`QSR2`) and keep `version = 2`,
 - New `Error` variants (`NoRecipients`, `TooManyRecipients`, `StreamFinished`,
   `StreamTruncated`); the enum is `#[non_exhaustive]`, so this is non-breaking.
 
+### Security (hardening from the validation pass)
+
+- **Multi-recipient key commitment.** Because AES-GCM is not key-committing, a
+  malicious sender could otherwise wrap different CEKs to different recipients
+  and craft one payload that decrypts to different plaintexts per recipient.
+  `QSM2` now carries `SHA3-256(CEK)`, bound into the payload AAD and checked
+  (constant-time) on open, so every recipient verifies the same CEK.
+- **Rotation rollback protection.** `RotationAttestation` now binds a
+  caller-supplied monotonic `epoch` (signed, exposed via `epoch()`), so a
+  verifier can reject a replayed, superseded attestation.
+  `attest_rotation` takes an `epoch` argument.
+- **AES-GCM state is now zeroized** (`aes-gcm` `zeroize` feature), so the key
+  schedule no longer lingers after the KEM secret is wiped.
+- **serde deserialization caps its pre-allocation**, closing an allocation-DoS
+  from an attacker-controlled `size_hint` in binary formats.
+- **Streaming counter-overflow guard moved before encryption**, removing an
+  internal nonce-reuse edge at the 2^32-chunk limit; per-chunk size is bounded
+  to the 32-bit frame length.
+
 ## [0.2.2] - 2026-07-04
 
 Hardening. `std` remains a default feature, so existing users are unaffected;

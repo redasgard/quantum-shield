@@ -2,12 +2,16 @@
 //! recipient set is bound into the payload authentication.
 
 use quantum_shield::{
-    seal_multi, Error, HybridCrypto, MultiRecipientEnvelope, HEADER_LEN, MAX_RECIPIENTS, WRAP_LEN,
+    seal_multi, Error, HybridCrypto, MultiRecipientEnvelope, CEK_COMMIT_LEN, HEADER_LEN,
+    MAX_RECIPIENTS, WRAP_LEN,
 };
 
 fn recipients(n: usize) -> Vec<HybridCrypto> {
     (0..n).map(|_| HybridCrypto::generate().unwrap()).collect()
 }
+
+/// Byte offset of the first wrap: header + u16 count + CEK commitment.
+const WRAPS_OFFSET: usize = HEADER_LEN + 2 + CEK_COMMIT_LEN;
 
 #[test]
 fn every_recipient_can_open() {
@@ -57,7 +61,7 @@ fn reordering_wraps_fails() {
     let bytes = seal_multi(b"order matters", &pubs).unwrap().to_bytes();
 
     // Swap wrap 0 and wrap 1 (payload AAD binds all wraps in order).
-    let base = HEADER_LEN + 2;
+    let base = WRAPS_OFFSET;
     let mut swapped = bytes.clone();
     let (a, b) = (base, base + WRAP_LEN);
     swapped[a..a + WRAP_LEN].copy_from_slice(&bytes[b..b + WRAP_LEN]);
@@ -81,10 +85,11 @@ fn dropping_a_wrap_fails() {
     // Remove the last wrap and decrement the count: the wrap AAD (which binds
     // the count) changes, so the remaining recipients' wraps no longer yield
     // the CEK.
-    let base = HEADER_LEN + 2;
+    let base = WRAPS_OFFSET;
     let mut tampered = Vec::new();
     tampered.extend_from_slice(&bytes[..HEADER_LEN]);
     tampered.extend_from_slice(&2u16.to_be_bytes()); // count 3 -> 2
+    tampered.extend_from_slice(&bytes[HEADER_LEN + 2..base]); // CEK commitment
     tampered.extend_from_slice(&bytes[base..base + 2 * WRAP_LEN]); // first two wraps
     tampered.extend_from_slice(&bytes[base + 3 * WRAP_LEN..]); // nonce + payload
     let env = MultiRecipientEnvelope::from_bytes(&tampered).unwrap();
@@ -101,11 +106,12 @@ fn duplicating_a_wrap_fails() {
     let bytes = seal_multi(b"no dupes", &pubs).unwrap().to_bytes();
 
     // Duplicate wrap 0 into a third slot and bump the count to 3.
-    let base = HEADER_LEN + 2;
+    let base = WRAPS_OFFSET;
     let wrap0 = &bytes[base..base + WRAP_LEN];
     let mut tampered = Vec::new();
     tampered.extend_from_slice(&bytes[..HEADER_LEN]);
     tampered.extend_from_slice(&3u16.to_be_bytes());
+    tampered.extend_from_slice(&bytes[HEADER_LEN + 2..base]); // CEK commitment
     tampered.extend_from_slice(&bytes[base..base + 2 * WRAP_LEN]);
     tampered.extend_from_slice(wrap0);
     tampered.extend_from_slice(&bytes[base + 2 * WRAP_LEN..]);
@@ -158,4 +164,18 @@ fn empty_plaintext_roundtrips() {
     let bob = HybridCrypto::generate().unwrap();
     let env = seal_multi(b"", &[bob.public_keys()]).unwrap();
     assert_eq!(bob.open_multi(&env).unwrap(), b"");
+}
+
+#[test]
+fn corrupting_the_cek_commitment_fails() {
+    // The commitment is bound into the payload AAD and explicitly checked, so
+    // tampering it must fail the open. This is the mechanism that prevents a
+    // malicious sender from wrapping different CEKs to different recipients.
+    let bob = HybridCrypto::generate().unwrap();
+    let mut bytes = seal_multi(b"committed", &[bob.public_keys()])
+        .unwrap()
+        .to_bytes();
+    bytes[HEADER_LEN + 2] ^= 0x01; // first byte of the CEK commitment
+    let env = MultiRecipientEnvelope::from_bytes(&bytes).unwrap();
+    assert_eq!(bob.open_multi(&env).unwrap_err(), Error::DecryptionFailed);
 }
