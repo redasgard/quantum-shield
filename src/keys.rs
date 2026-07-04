@@ -15,6 +15,8 @@
 use crate::constants::*;
 use crate::error::{Error, Result};
 use crate::wire::{read_header, take, write_header};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use ml_dsa::signature::Keypair as _;
 use ml_dsa::{KeyExport as _, MlDsa87};
 use ml_kem::{DecapsulationKey1024, EncapsulationKey1024};

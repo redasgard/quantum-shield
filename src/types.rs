@@ -3,6 +3,8 @@
 use crate::constants::*;
 use crate::error::{Error, Result};
 use crate::wire::{read_header, take, write_header};
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 /// An encrypted message: hybrid KEM ciphertext plus AEAD-protected payload.
 ///

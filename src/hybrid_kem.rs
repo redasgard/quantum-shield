@@ -28,6 +28,7 @@
 use crate::constants::*;
 use crate::error::{Error, Result};
 use crate::keys::{KeyPair, PublicKeyBundle};
+use alloc::boxed::Box;
 use ml_kem::kem::{Decapsulate as _, KeyExport as _};
 use sha3::{Digest, Sha3_256};
 use zeroize::Zeroizing;

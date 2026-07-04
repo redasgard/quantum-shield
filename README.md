@@ -130,8 +130,24 @@ threat model in [docs/security-model.md](docs/security-model.md).
 
 ## Features
 
+- `std` (on by default): standard-library integration. Disable it for a
+  `no_std` build.
 - `serde` (off by default): `Serialize`/`Deserialize` for the wire types as
   validated byte strings.
+
+## `no_std`
+
+The crate is `#![no_std]` and depends only on `alloc`:
+
+```toml
+quantum-shield = { version = "0.2", default-features = false }
+```
+
+It builds for bare-metal targets (CI checks `thumbv7em-none-eabi`). On a
+target without an OS randomness source you must supply a `getrandom` backend —
+see the [getrandom custom-backend docs](https://docs.rs/getrandom/latest/getrandom/#custom-backend).
+Without one, key generation and encryption cannot obtain entropy and the crate
+will not link.
 
 ## Minimum supported Rust version
 

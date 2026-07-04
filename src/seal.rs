@@ -7,6 +7,7 @@ use crate::keys::{KeyPair, PublicKeyBundle};
 use crate::types::Envelope;
 use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit};
+use alloc::vec::Vec;
 
 /// Encrypt `plaintext` for `recipient`.
 ///

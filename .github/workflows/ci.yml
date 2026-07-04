@@ -39,8 +39,8 @@ jobs:
         run: cargo test
       - name: Test (all features)
         run: cargo test --all-features
-      - name: Test (no default features)
-        run: cargo test --no-default-features
+      - name: Build (no default features, no_std)
+        run: cargo build --no-default-features
       - name: Docs
         run: cargo doc --all-features --no-deps
         env:
@@ -57,6 +57,19 @@ jobs:
           toolchain: "1.85"
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --all-targets --all-features
+
+  no-std:
+    name: no_std (thumbv7em-none-eabi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi
+      - uses: Swatinem/rust-cache@v2
+      # Compiles the library for a bare-metal target with no OS and a custom
+      # randomness backend — the honest no_std gate.
+      - run: cargo check --manifest-path ci/no_std_check/Cargo.toml
 
   deny:
     name: cargo-deny

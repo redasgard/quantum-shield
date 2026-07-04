@@ -29,6 +29,7 @@ macro_rules! impl_serde_via_bytes {
 /// sequences of integers, so the impls work with self-describing formats
 /// (JSON arrays) and binary formats (bincode, CBOR byte strings) alike.
 mod serde_bytes_shim {
+    use alloc::vec::Vec;
     use serde::{de, Deserialize, Deserializer};
 
     pub(super) struct ByteBuf(pub(super) Vec<u8>);

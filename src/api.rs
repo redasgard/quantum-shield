@@ -3,6 +3,7 @@
 use crate::error::Result;
 use crate::keys::{KeyPair, PublicKeyBundle};
 use crate::types::{Envelope, HybridSignature};
+use alloc::vec::Vec;
 use zeroize::Zeroizing;
 
 /// A hybrid keypair with convenience methods for the common workflows.

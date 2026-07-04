@@ -4,6 +4,7 @@
 
 use crate::constants::{HEADER_LEN, SUITE_ID, WIRE_VERSION};
 use crate::error::{Error, Result};
+use alloc::vec::Vec;
 
 /// Append the 6-byte header for `magic` to `out`.
 pub(crate) fn write_header(out: &mut Vec<u8>, magic: [u8; 4]) {
