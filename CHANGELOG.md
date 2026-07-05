@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-05
+
+Documentation-only patch; no code or API changes.
+
+### Fixed
+
+- README quick-start snippets now reference `quantum-shield = "0.3"` (they
+  still said `"0.2"`). Re-released so the crates.io / docs.rs copy of the
+  README is correct.
+
 ## [0.3.0] - 2026-07-04
 
 New capabilities. All additive — the single-recipient `Envelope` (`QSE2`),
