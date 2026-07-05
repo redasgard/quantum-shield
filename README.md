@@ -32,7 +32,7 @@ on Linux and on macOS arm64 (Apple Silicon) runners.
 
 ```toml
 [dependencies]
-quantum-shield = "0.2"
+quantum-shield = "0.3"
 ```
 
 ### Encryption
@@ -156,7 +156,7 @@ All are specified in [docs/design.md](docs/design.md).
 The crate is `#![no_std]` and depends only on `alloc`:
 
 ```toml
-quantum-shield = { version = "0.2", default-features = false }
+quantum-shield = { version = "0.3", default-features = false }
 ```
 
 It builds for bare-metal targets (CI checks `thumbv7em-none-eabi`). On a
