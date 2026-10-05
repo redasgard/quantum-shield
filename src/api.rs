@@ -14,7 +14,7 @@ use zeroize::Zeroizing;
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```
 /// use quantum_shield::HybridCrypto;
 ///
 /// # fn main() -> quantum_shield::Result<()> {

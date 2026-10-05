@@ -25,7 +25,7 @@
 
 use dudect_bencher::rand::RngExt;
 use dudect_bencher::{ctbench_main, BenchRng, Class, CtRunner};
-use quantum_shield::{seal, Envelope, HybridCrypto};
+use quantum_shield::{seal, Envelope, HybridCrypto, HEADER_LEN, X25519_PK_LEN};
 
 const SAMPLES: usize = 100_000;
 
@@ -74,9 +74,10 @@ fn open_tampered_ciphertext(runner: &mut CtRunner, rng: &mut BenchRng) {
             if rng.random::<bool>() {
                 (envelope, Class::Left)
             } else {
-                // Flip one byte inside the ML-KEM ciphertext region.
+                // Flip one byte inside the ML-KEM ciphertext, which follows
+                // the header and the ephemeral X25519 key.
                 let mut bytes = envelope.to_bytes();
-                bytes[10] ^= 0x01;
+                bytes[HEADER_LEN + X25519_PK_LEN + 100] ^= 0x01;
                 (Envelope::from_bytes(&bytes).unwrap(), Class::Right)
             }
         })

@@ -109,7 +109,11 @@ pub const WRAP_LEN: usize = X25519_PK_LEN + MLKEM1024_CT_LEN + NONCE_LEN + CEK_L
 /// both seal and parse time, since `open` trial-decrypts every wrap).
 pub const MAX_RECIPIENTS: usize = 1024;
 
-/// Plaintext bytes per chunk in a streaming envelope (64 KiB).
+/// Recommended plaintext bytes per chunk in a streaming envelope (64 KiB).
+/// The format does not fix the chunk size; [`StreamSealer::seal_chunk`]
+/// accepts any length that fits the 32-bit frame field.
+///
+/// [`StreamSealer::seal_chunk`]: crate::StreamSealer::seal_chunk
 pub const STREAM_CHUNK_SIZE: usize = 64 * 1024;
 
 /// Length of the random nonce prefix in a streaming envelope. The 12-byte

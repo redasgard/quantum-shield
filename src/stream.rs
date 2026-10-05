@@ -2,7 +2,7 @@
 //! in memory or to seal in one shot (over [`MAX_PLAINTEXT_LEN`]).
 //!
 //! One hybrid KEM run (X25519 + ML-KEM-1024) derives a single AES-256-GCM key;
-//! the payload is then encrypted in fixed-size chunks using the STREAM
+//! the payload is then encrypted in chunks using the STREAM
 //! construction (Rogaway/Hoang online authenticated encryption):
 //!
 //! - The 12-byte per-chunk nonce is `prefix (7) || u32 chunk index || last (1)`.
@@ -12,8 +12,9 @@
 //! - The final chunk sets the last-flag to 1. A stream that never presents a
 //!   last chunk is [`Error::StreamTruncated`] at [`StreamOpener::finish`].
 //!
-//! Chunks are [`STREAM_CHUNK_SIZE`] (64 KiB) of plaintext each; the `u32`
-//! counter allows up to 2^32 chunks (256 TiB) before rejection.
+//! The caller chooses each chunk's size (up to 2^32 − 17 bytes);
+//! [`STREAM_CHUNK_SIZE`] (64 KiB) is the recommended value. The `u32` counter
+//! allows up to 2^32 chunks before the stream is refused.
 //!
 //! ```
 //! use quantum_shield::{HybridCrypto, StreamSealer};
@@ -30,6 +31,7 @@
 //! opener.finish()?;
 //! assert_eq!(out, b"first part second part");
 //! # Ok(()) }
+//! # run().unwrap();
 //! ```
 
 use crate::constants::*;

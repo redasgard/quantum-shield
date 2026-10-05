@@ -1,6 +1,6 @@
 [package]
 name = "quantum-shield"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 rust-version = "1.85"
 authors = ["valh4x"]
@@ -10,20 +10,22 @@ repository = "https://github.com/redasgard/quantum-shield"
 keywords = ["cryptography", "post-quantum", "ml-kem", "ml-dsa", "hybrid"]
 categories = ["cryptography"]
 readme = "README.md"
+# The NIST ACVP vectors (2.4 MiB) are repository-only.
+exclude = ["tests/acvp.rs", "tests/data/acvp/", ".cargo/"]
 
 [dependencies]
 ml-kem = { version = "0.3.2", default-features = false, features = ["alloc", "zeroize", "getrandom"] }
 ml-dsa = { version = "0.1.1", default-features = false, features = ["alloc", "zeroize"] }
-x25519-dalek = { version = "2.0.1", default-features = false, features = ["static_secrets", "zeroize"] }
-ed25519-dalek = { version = "2.2.0", default-features = false, features = ["alloc", "fast", "zeroize"] }
-aes-gcm = { version = "0.11", default-features = false, features = ["aes", "alloc", "zeroize"] }
+x25519-dalek = { version = "3.0.0", default-features = false, features = ["static_secrets", "zeroize", "precomputed-tables"] }
+ed25519-dalek = { version = "3.0.0", default-features = false, features = ["alloc", "fast", "zeroize"] }
+aes-gcm = { version = "0.11.1", default-features = false, features = ["aes", "alloc", "zeroize"] }
 sha3 = { version = "0.12", default-features = false }
 getrandom = "0.4"
-zeroize = { version = "1.8", default-features = false, features = ["derive", "alloc"] }
+zeroize = { version = "1.9", default-features = false, features = ["derive", "alloc"] }
 subtle = { version = "2.6", default-features = false }
 thiserror = { version = "2", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"], optional = true }
-pem-rfc7468 = { version = "0.7", default-features = false, features = ["alloc"], optional = true }
+pem-rfc7468 = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.7.0", default-features = false, features = ["cargo_bench_support"] }
@@ -39,11 +41,11 @@ default = ["std"]
 # `std` enables `std::error::Error` for the error type and the std-specific
 # features of dependencies. Disable it (`--no-default-features`) for a
 # `no_std` + `alloc` build. `alloc` is always required.
-std = ["thiserror/std", "ed25519-dalek/std", "serde?/std"]
+std = ["thiserror/std", "serde?/std"]
 serde = ["dep:serde"]
 # Per-component PEM export/import of public keys: standard SubjectPublicKeyInfo
-# for ML-KEM, ML-DSA, and Ed25519; a raw block for X25519 (which has no PKCS#8
-# support). QSP2/QSK2 remain the primary key formats.
+# for ML-KEM, ML-DSA, and Ed25519; a raw block for X25519 (x25519-dalek has no
+# SPKI encoder, although RFC 8410 defines one). QSP2/QSK2 remain the primary key formats.
 pem = [
     "dep:pem-rfc7468",
     "ml-kem/pkcs8", "ml-kem/pem",

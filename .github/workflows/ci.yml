@@ -93,11 +93,28 @@ jobs:
           fetch-depth: 0  # need history + tags for the baseline
       - uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
-          # Compare the current API against the 0.2.0 release commit. (A commit
-          # SHA rather than a tag because this environment's git remote does not
-          # accept tag pushes.) The wire types are byte-serialized, so this also
-          # guards the wire format.
-          baseline-rev: 358796ca20ed060b9537dd7cfcb4f5e2c7b3eeba
+          # Compare the public API against the latest release on crates.io.
+          baseline-version: 0.3.1
+
+  interop:
+    name: interop (independent Python implementation)
+    # A second implementation of every wire format, written from
+    # docs/design.md with unrelated crypto libraries (OpenSSL via pyca, and the
+    # pure-Python FIPS 203/204 references), must open and verify what this
+    # crate produces. Keeps the spec and the code honest with each other.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r ci/interop/requirements.txt
+      - run: |
+          mkdir -p "$RUNNER_TEMP/artifacts"
+          cargo run --release --example interop_gen -- "$RUNNER_TEMP/artifacts"
+          python ci/interop/cleanroom.py "$RUNNER_TEMP/artifacts"
 
   coverage:
     name: coverage

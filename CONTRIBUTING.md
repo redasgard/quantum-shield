@@ -1,405 +1,91 @@
 # Contributing to Quantum Shield
 
-Thank you for your interest in contributing to Quantum Shield! This document provides guidelines and information for contributors.
+Thanks for your interest. Quantum Shield is a security-critical library, so
+changes are held to a high bar: every claim in the docs must be true of the
+code, and every behaviour change needs a test.
 
-## Table of Contents
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
 
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [How to Contribute](#how-to-contribute)
-- [Development Setup](#development-setup)
-- [Testing](#testing)
-- [Security](#security)
-- [Documentation](#documentation)
-- [Release Process](#release-process)
+**Security issues:** do not open a public issue. Email
+security@redasgard.com (see [SECURITY.md](SECURITY.md)).
 
-## Code of Conduct
+## Prerequisites
 
-This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold this code.
+- Rust 1.85+ (the MSRV, set by the `ml-kem`/`ml-dsa` and dalek 3 dependencies)
+- For fuzzing: a nightly toolchain and `cargo install cargo-fuzz`
+- For the interop check: Python 3.10+
 
-## Getting Started
+## Project layout
 
-### Prerequisites
-
-- Rust 1.70+ (latest stable recommended)
-- Git
-- Understanding of cryptography and post-quantum algorithms
-- Familiarity with NIST standards and FIPS compliance
-- Basic knowledge of hybrid cryptography and key management
-
-### Fork and Clone
-
-1. Fork the repository on GitHub
-2. Clone your fork locally:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/quantum-shield.git
-   cd quantum-shield
-   ```
-3. Add the upstream remote:
-   ```bash
-   git remote add upstream https://github.com/redasgard/quantum-shield.git
-   ```
-
-## How to Contribute
-
-### Reporting Issues
-
-Before creating an issue, please:
-
-1. **Search existing issues** to avoid duplicates
-2. **Check the documentation** in the `docs/` folder
-3. **Verify the issue** with the latest version
-4. **Test with minimal examples**
-
-When creating an issue, include:
-
-- **Clear description** of the problem
-- **Steps to reproduce** with code examples
-- **Expected vs actual behavior**
-- **Environment details** (OS, Rust version, crypto setup)
-- **Cryptographic details** (if related to specific algorithms)
-
-### Suggesting Enhancements
-
-For feature requests:
-
-1. **Check existing issues** and roadmap
-2. **Describe the use case** clearly
-3. **Explain the cryptographic benefit**
-4. **Consider implementation complexity**
-5. **Provide cryptographic examples** if applicable
-
-### Pull Requests
-
-#### Before You Start
-
-1. **Open an issue first** for significant changes
-2. **Discuss the approach** with maintainers
-3. **Ensure the change aligns** with project goals
-4. **Consider cryptographic security** implications
-
-#### PR Process
-
-1. **Create a feature branch** from `main`:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-2. **Make your changes** following our guidelines
-
-3. **Test thoroughly**:
-   ```bash
-   cargo test
-   cargo test --features tracing
-   cargo clippy
-   cargo fmt
-   ```
-
-4. **Update documentation** if needed
-
-5. **Commit with clear messages**:
-   ```bash
-   git commit -m "Add support for new post-quantum algorithm"
-   ```
-
-6. **Push and create PR**:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-#### PR Requirements
-
-- **All tests pass** (CI will check)
-- **Code is formatted** (`cargo fmt`)
-- **No clippy warnings** (`cargo clippy`)
-- **Documentation updated** if needed
-- **Clear commit messages**
-- **PR description** explains the change
-- **Cryptographic security** maintained
-
-## Development Setup
-
-### Project Structure
-
-```
-quantum-shield/
-├── src/                 # Source code
-│   ├── lib.rs          # Main library interface
-│   ├── crypto.rs       # Cryptographic operations
-│   ├── keys.rs         # Key management
-│   ├── security.rs     # Security features
-│   └── types.rs        # Type definitions
-├── tests/              # Integration tests
-├── examples/           # Usage examples
-└── docs/               # Documentation
+```text
+src/
+  lib.rs           crate root, re-exports
+  api.rs           HybridCrypto convenience wrapper
+  keys.rs          KeyPair, PublicKeyBundle (QSP2), secret seeds (QSK2), key_id
+  hybrid_kem.rs    X25519 + ML-KEM-1024 KEM and the SHA3-256 combiner
+  seal.rs          single-recipient envelope (QSE2)
+  sign.rs          hybrid Ed25519 + ML-DSA-87 signatures (QSS2)
+  multi.rs         multi-recipient envelope (QSM2)
+  stream.rs        streaming AEAD (QST2)
+  rotate.rs        rotation attestations (QSR2)
+  types.rs wire.rs constants.rs error.rs
+  pem.rs           `pem` feature
+  serde_impls.rs   `serde` feature
+tests/             integration, adversarial, golden, NIST ACVP, RFC vectors
+benches/           criterion benchmarks
+examples/          basic_usage, dudect (constant-time tripwire), interop_gen
+fuzz/              cargo-fuzz targets (separate crate)
+ci/no_std_check/   bare-metal no_std build gate
+ci/interop/        independent Python implementation of the wire formats
+docs/              design.md (normative format spec), security-model.md,
+                   gap-matrix.md, migration-v1-to-v2.md
 ```
 
-### Running Tests
+## Before opening a PR
+
+Run what CI runs:
 
 ```bash
-# Run all tests
+cargo fmt --all --check
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test
+cargo test --all-features
+RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
+cargo check --manifest-path ci/no_std_check/Cargo.toml   # bare-metal no_std
+cargo deny check advisories bans licenses sources
 
-# Run with tracing
-cargo test --features tracing
-
-# Run specific test
-cargo test test_hybrid_encryption
-
-# Run examples
-cargo run --example basic_usage
+# Independent implementation must still open what the crate produces:
+pip install -r ci/interop/requirements.txt
+cargo run --example interop_gen -- /tmp/qs-artifacts
+python ci/interop/cleanroom.py /tmp/qs-artifacts
 ```
 
-### Code Style
-
-We follow standard Rust conventions:
-
-- **Format code**: `cargo fmt`
-- **Check linting**: `cargo clippy`
-- **Use meaningful names**
-- **Add documentation** for public APIs
-- **Write tests** for new functionality
-- **Consider cryptographic performance**
-
-## Testing
-
-### Test Categories
-
-1. **Unit Tests**: Test individual functions
-2. **Integration Tests**: Test complete workflows
-3. **Cryptographic Tests**: Test with real cryptographic operations
-4. **Security Tests**: Test against known attacks
-5. **Performance Tests**: Test cryptographic performance
-
-### Adding Tests
-
-When adding new functionality:
-
-1. **Write unit tests** for each function
-2. **Add integration tests** for workflows
-3. **Test with real cryptographic operations**
-4. **Test security properties**
-5. **Test performance characteristics**
-
-Example test structure:
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_hybrid_encryption() {
-        let alice = HybridCrypto::generate().unwrap();
-        let bob = HybridCrypto::generate().unwrap();
-
-        let message = b"Secret message";
-        let envelope = alice.seal_for(message, bob.public_keys()).unwrap();
-        let decrypted = bob.open(&envelope).unwrap();
-
-        assert_eq!(message, &decrypted[..]);
-    }
-
-    #[test]
-    fn test_hybrid_signatures() {
-        let alice = HybridCrypto::generate().unwrap();
-
-        let message = b"Message to sign";
-        let signature = alice.sign(message, b"").unwrap();
-        quantum_shield::verify(message, b"", &signature, alice.public_keys()).unwrap();
-    }
-}
-```
-
-## Security
-
-### Security Considerations
-
-Quantum Shield is a security-critical library. When contributing:
-
-1. **Understand cryptographic security** before making changes
-2. **Test with real cryptographic operations** (safely)
-3. **Consider key management** security
-4. **Review security implications** of changes
-5. **Test with various cryptographic algorithms**
-
-### Security Testing
+Useful focused runs:
 
 ```bash
-# Run the adversarial suites
-cargo test --test tamper
-cargo test --test downgrade
-cargo test --test proptests
-
-# Test with examples
-cargo run --example basic_usage
+cargo test --test acvp          # NIST ACVP vectors
+cargo test --test tamper        # adversarial byte-flip / splice suite
+cargo test --test downgrade     # v1 / unknown-version rejection
+cargo +nightly fuzz run envelope_from_bytes -- -max_total_time=60
+cargo run --release --example dudect
 ```
 
-### Cryptographic Security
+## Rules for cryptographic changes
 
-When adding security features:
+- **Wire formats are frozen.** A change to any format in `docs/design.md`
+  needs a new magic/version or suite id, never an edit to the pinned golden
+  vectors in `tests/golden.rs`. Update `docs/design.md` and
+  `ci/interop/cleanroom.py` together.
+- **No algorithm negotiation.** New algorithms are new suite ids.
+- **Every secret is zeroized**, every comparison of secret-dependent data is
+  constant-time (`subtle`), and errors on decryption/verification stay
+  uniform.
+- **Docs must not overclaim.** Do not describe the crate as audited,
+  FIPS-validated, or proven secure; say what is tested and how.
 
-1. **Research cryptographic security** best practices
-2. **Understand key management** techniques
-3. **Test with malicious inputs**
-4. **Consider side-channel attacks**
-5. **Document security implications**
+## Releases
 
-### Reporting Security Issues
-
-**Do not open public issues for security vulnerabilities.**
-
-Instead:
-1. Email security@redasgard.com
-2. Include detailed description
-3. Include cryptographic examples
-4. Wait for response before disclosure
-
-## Documentation
-
-### Documentation Standards
-
-- **Public APIs** must have doc comments
-- **Examples** in doc comments should be runnable
-- **Security implications** should be documented
-- **Performance characteristics** should be noted
-- **Cryptographic concepts** should be explained
-
-### Documentation Structure
-
-```
-docs/
-├── design.md               # Normative v2 wire-format + combiner spec
-├── security-model.md       # Threat model and non-goals
-└── migration-v1-to-v2.md   # Upgrading from 0.1.x
-```
-
-Complete API documentation is generated from doc comments and published on
-[docs.rs](https://docs.rs/quantum-shield).
-
-### Writing Documentation
-
-1. **Use clear, concise language**
-2. **Include practical examples**
-3. **Explain security implications**
-4. **Document cryptographic concepts**
-5. **Link to related resources**
-6. **Keep it up to date**
-
-## Release Process
-
-### Versioning
-
-We follow [Semantic Versioning](https://semver.org/):
-
-- **MAJOR**: Breaking API changes
-- **MINOR**: New features (backward compatible)
-- **PATCH**: Bug fixes (backward compatible)
-
-### Release Checklist
-
-Before releasing:
-
-- [ ] All tests pass
-- [ ] Documentation updated
-- [ ] CHANGELOG.md updated
-- [ ] Version bumped in Cargo.toml
-- [ ] Security review completed
-- [ ] Performance benchmarks updated
-- [ ] Cryptographic compatibility tested
-
-### Release Steps
-
-1. **Update version** in `Cargo.toml`
-2. **Update CHANGELOG.md**
-3. **Create release PR**
-4. **Review and merge**
-5. **Tag release** on GitHub
-6. **Publish to crates.io**
-
-## Areas for Contribution
-
-### High Priority
-
-- **New post-quantum algorithms**: Add support for additional PQC algorithms
-- **Performance improvements**: Optimize cryptographic operations
-- **Security enhancements**: Better key management and side-channel protection
-- **Standards compliance**: Improve NIST and FIPS compliance
-
-### Medium Priority
-
-- **Configuration options**: More flexible cryptographic configuration
-- **Error handling**: Better error messages and recovery
-- **Testing**: More comprehensive test coverage
-- **Documentation**: Improve examples and guides
-
-### Low Priority
-
-- **CLI tools**: Command-line utilities for cryptographic operations
-- **Monitoring**: Cryptographic monitoring and observability
-- **Visualization**: Cryptographic data visualization tools
-- **Hot reloading**: Runtime cryptographic configuration updates
-
-## Cryptographic Development
-
-### Algorithm Categories
-
-Quantum Shield builds on hybrid systems that AND-compose a classical and a
-post-quantum primitive:
-
-1. **Post-Quantum KEM**: ML-KEM (FIPS 203); the suite currently uses ML-KEM-1024
-2. **Post-Quantum Signatures**: ML-DSA (FIPS 204); the suite currently uses ML-DSA-87
-3. **Classical primitives**: X25519, Ed25519, AES-256-GCM, SHA3
-4. **Hybrid Systems**: classical + post-quantum combined through a KDF/framing so both must be broken
-
-New algorithms are introduced as new cipher-suite ids, never as silent
-negotiation within an existing suite.
-
-### Algorithm Development Process
-
-1. **Research**: Understand the algorithm and its security properties
-2. **Implement**: Create algorithm implementation
-3. **Test**: Test with real cryptographic operations
-4. **Validate**: Ensure security and performance
-5. **Document**: Document the algorithm and its capabilities
-6. **Deploy**: Make the algorithm available
-
-### Algorithm Testing
-
-```rust
-// Test new algorithm
-#[test]
-fn test_new_algorithm() {
-    let crypto = HybridCrypto::new();
-    
-    // Test algorithm functionality
-    let result = crypto.test_algorithm();
-    assert!(result.is_ok());
-}
-```
-
-## Getting Help
-
-### Resources
-
-- **Documentation**: Check the `docs/` folder
-- **Examples**: Look at `examples/` folder
-- **Issues**: Search existing GitHub issues
-- **Discussions**: Use GitHub Discussions for questions
-
-### Contact
-
-- **Email**: hello@redasgard.com
-- **GitHub**: [@redasgard](https://github.com/redasgard)
-- **Security**: security@redasgard.com
-
-## Recognition
-
-Contributors will be:
-
-- **Listed in CONTRIBUTORS.md**
-- **Mentioned in release notes** for significant contributions
-- **Credited in documentation** for major features
-- **Acknowledged** for cryptographic development
-
-Thank you for contributing to Quantum Shield! 🔐🛡️
+1. Bump `version` in `Cargo.toml` and add a `CHANGELOG.md` entry.
+2. Merge a release PR with CI green (including `semver-checks`).
+3. Tag `vX.Y.Z` on the merge commit and create a GitHub release.
+4. `cargo publish`.

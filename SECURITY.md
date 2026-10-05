@@ -4,7 +4,8 @@
 
 | Version | Supported |
 | ------- | --------- |
-| 0.2.x   | ✅ |
+| 0.3.x   | ✅ |
+| 0.2.x   | — never published (development line for 0.3) |
 | 0.1.x   | ❌ — cryptographically broken by design, upgrade immediately (see [docs/migration-v1-to-v2.md](docs/migration-v1-to-v2.md)) |
 
 ## Known limitations

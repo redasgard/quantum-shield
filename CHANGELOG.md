@@ -5,6 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-10-05
+
+Maintenance and verification release. No wire-format or public API changes:
+everything produced by 0.3.0/0.3.1 still opens and verifies. The one
+behaviour change is that public-key bundles carrying degenerate keys are now
+rejected (see Security).
+
+### Security
+
+- **Degenerate public keys are rejected at parse.** `PublicKeyBundle::from_bytes`
+  (and so `from_pem`, serde, and `RotationAttestation::from_bytes`) now
+  rejects low-order X25519 keys, including all-zero, which would have
+  silently reduced the hybrid KEM to ML-KEM alone for that recipient. It also
+  rejects non-canonically encoded or small-order Ed25519 keys, which gave one
+  key several encodings and `key_id`s. 0.3.1 accepted all of these.
+- **`open_multi` does constant work across wraps.** It previously stopped at
+  the first matching wrap, so timing revealed the recipient's position.
+- The ML-KEM component shared secret is now zeroized after use, and the
+  ephemeral X25519 seed is no longer copied out of its `Zeroizing` buffer.
+
+### Changed
+
+- `x25519-dalek` / `ed25519-dalek` 2 → 3 (`curve25519-dalek` 5). The
+  dependency tree is now on one RustCrypto generation (one `getrandom`, one
+  `rand_core`, one `digest`, one `pkcs8`). Also `aes-gcm` 0.11.1,
+  `zeroize` 1.9, `pem-rfc7468` 1.0. MSRV stays 1.85; the lockfile is resolved
+  MSRV-aware (`.cargo/config.toml`), and the README explains how to get
+  compatible transitive versions on 1.85–1.88 (`aes` 0.9.3 needs 1.89).
+- Lockfile refreshed: the previously locked `der` 0.8.0 and `chacha20`
+  0.10.1 were yanked upstream, which had made the `cargo-deny` CI job fail.
+
+### Added
+
+- `tests/acvp.rs`: the official NIST ACVP vectors for ML-KEM-1024 (key
+  generation, encapsulation, decapsulation incl. implicit rejection, key
+  checks) and ML-DSA-87 (key generation, deterministic and hedged signing,
+  verification). They include NIST seeds imported through the crate's own
+  `QSK2` format. Repository-only; excluded from the published package.
+- `ci/interop/`: an independent Python implementation of all seven wire
+  formats, written from `docs/design.md` on unrelated libraries, plus the
+  `interop_gen` example. A new CI job checks that it opens and verifies what
+  the crate produces.
+- `tests/weak_keys.rs` for the new key checks.
+
+### Fixed (documentation)
+
+- The KEM combiner was described as "the X-Wing combiner ported to
+  ML-KEM-1024". It is not X-Wing; the docs now describe what it is.
+- Streaming chunk size: documented as fixed at 64 KiB, but the caller has
+  always chosen it. `STREAM_CHUNK_SIZE` is now documented as the
+  recommended size.
+- `examples/dudect.rs` flipped a byte of the X25519 key, not the ML-KEM
+  ciphertext, so implicit rejection was never measured.
+- SECURITY.md and the migration guide referred to 0.2.x, which was never
+  published. CONTRIBUTING.md still described 0.1.x (Rust 1.70, a `tracing`
+  feature, tests that don't exist).
+- `docs/design.md`: byte order of integer fields, the full list of magics,
+  public-key validation rules, and which formats are covered by which tests.
+- The `QSM2` layout in the rustdoc was missing `cek_commitment`; several
+  CHANGELOG entries misdescribed things (rotation message, CEK commitment,
+  dudect, benchmarks, the 0.1.0 date).
+- Doc examples that never executed (`no_run`, or bodies inside an uncalled
+  `fn run`) now run.
+- 545 build artifacts committed under `ci/no_std_check/target/` were removed.
+
 ## [0.3.1] - 2026-07-05
 
 Documentation-only patch; no code or API changes.
@@ -31,12 +96,12 @@ wire objects use new magics (`QSM2`/`QST2`/`QSR2`) and keep `version = 2`,
   Opening trial-decrypts with no recipient identifier on the wire;
   `MAX_RECIPIENTS = 1024` bounds the cost.
 - **Streaming AEAD** (`QST2`): `StreamSealer` / `StreamOpener` for payloads
-  over `MAX_PLAINTEXT_LEN`. One hybrid KEM keys a STREAM of 64 KiB chunks;
+  over `MAX_PLAINTEXT_LEN`. One hybrid KEM keys a STREAM of caller-sized chunks (64 KiB recommended);
   each chunk binds its index and a last-flag, so reorder/duplicate/drop/
   truncate all fail (`StreamTruncated` at `finish`).
 - **Key rotation** (`QSR2`): `PublicKeyBundle::key_id` (`SHA3-256(QSP2)[..16]`)
   and `RotationAttestation` — the old keypair hybrid-signs `old_key_id ||
-  new_public`, giving verifiers a cryptographic old→new link
+  epoch || new_public`, giving verifiers a cryptographic old→new link
   (`HybridCrypto::attest_rotation`, `verify_rotation`).
 - New parser fuzz targets, normative `docs/design.md` sections for all three
   formats, and golden vectors (`key_id`, deterministic rotation attestation).
@@ -48,7 +113,7 @@ wire objects use new magics (`QSM2`/`QST2`/`QSR2`) and keep `version = 2`,
 - **Multi-recipient key commitment.** Because AES-GCM is not key-committing, a
   malicious sender could otherwise wrap different CEKs to different recipients
   and craft one payload that decrypts to different plaintexts per recipient.
-  `QSM2` now carries `SHA3-256(CEK)`, bound into the payload AAD and checked
+  `QSM2` now carries `SHA3-256(label || CEK)`, bound into the payload AAD and checked
   (constant-time) on open, so every recipient verifies the same CEK.
 - **Rotation rollback protection.** `RotationAttestation` now binds a
   caller-supplied monotonic `epoch` (signed, exposed via `epoch()`), so a
@@ -62,7 +127,7 @@ wire objects use new magics (`QSM2`/`QST2`/`QSR2`) and keep `version = 2`,
   internal nonce-reuse edge at the 2^32-chunk limit; per-chunk size is bounded
   to the 32-bit frame length.
 
-## [0.2.2] - 2026-07-04
+## [0.2.2] - 2026-07-04 (not published to crates.io)
 
 Hardening. `std` remains a default feature, so existing users are unaffected;
 all additions are opt-in.
@@ -71,15 +136,16 @@ all additions are opt-in.
 
 - `no_std` support: the crate is `#![no_std]` and needs only `alloc`. Disable
   the default `std` feature for embedded targets (supply a `getrandom` backend;
-  CI compiles the full API for `thumbv7em-none-eabi`).
+  CI type-checks the full API with `cargo check` for `thumbv7em-none-eabi`).
 - `pem` feature: `PublicKeyBundle::{to_pem, from_pem}` — per-component PEM for
   the public keys (standard SubjectPublicKeyInfo for ML-KEM/ML-DSA/Ed25519, a
   raw block for X25519). The `QSP2` bundle stays the primary format; PEM import
   round-trips through it, so it enforces the same validation. A fuzz target
   covers the new parser.
 - `examples/dudect.rs`: a dudect constant-time regression harness on `open`
-  (decapsulate + AEAD), wired as a non-gating CI job. Measures low t-values
-  locally, confirming decryption-failure timing does not leak.
+  (decapsulate + AEAD), wired as a non-gating CI job. It measured low
+  t-values locally; as a statistical tripwire it can flag a leak but cannot
+  show there is none. (Its tamper case flipped the wrong byte until 0.3.2.)
 
 ### Changed
 
@@ -87,7 +153,7 @@ all additions are opt-in.
   drops its `getrandom` default (signing is deterministic) and `ed25519-dalek`
   uses `alloc` instead of `std` unless the `std` feature is on.
 
-## [0.2.1] - 2026-07-04
+## [0.2.1] - 2026-07-04 (not published to crates.io)
 
 Assurance and tooling; no source or wire-format changes (API-compatible with
 0.2.0).
@@ -95,8 +161,9 @@ Assurance and tooling; no source or wire-format changes (API-compatible with
 ### Added
 
 - Criterion benchmarks (`benches/crypto.rs`, `benches/codec.rs`) for key
-  generation, seal/open, sign/verify, and the wire codecs — measured numbers
-  replacing the fabricated ones removed in 0.2.0.
+  generation, seal/open, sign/verify, and the wire codecs, replacing the
+  fabricated numbers removed in 0.2.0. No numbers are published; run them on
+  your own hardware.
 - In-crate known-answer tests: RFC 7748 (X25519) and RFC 8032 (Ed25519)
   official vectors, plus deterministic stability KATs for ML-KEM-1024 and
   ML-DSA-87 that pin the parameter set and FIPS sizes against the locked
@@ -104,9 +171,10 @@ Assurance and tooling; no source or wire-format changes (API-compatible with
 - `fuzz/` cargo-fuzz crate: six libFuzzer targets covering every `from_bytes`
   parser and the seal/open and sign/verify roundtrips.
 - CI jobs: `cargo-semver-checks` (baseline `v0.2.0`), coverage
-  (`cargo-llvm-cov` → Codecov, non-gating), and a nightly fuzz smoke run.
+  (`cargo-llvm-cov` → Codecov, non-gating), and a fuzz smoke run (nightly
+  toolchain) on every push.
 
-## [0.2.0] - 2026-07-04
+## [0.2.0] - 2026-07-04 (not published to crates.io)
 
 Complete cryptographic rewrite. **Breaking in every dimension: algorithms,
 wire format, and API.** Artifacts produced by 0.1.x cannot be read by 0.2.0
@@ -121,8 +189,8 @@ Version 0.1.x was not quantum-resistant despite its claims:
   wrapped independently by RSA-4096 and by Kyber-1024; recovering *either*
   wrap revealed the key, so a quantum attacker only had to break RSA. 0.2.0
   derives the AEAD key from a SHA3-256 combiner over **both** shared secrets
-  and the full public transcript (X-Wing construction ported to
-  ML-KEM-1024) — both layers must now be broken.
+  and the full public transcript (a Chempat-style full-transcript combiner;
+  earlier docs misnamed it X-Wing) — both layers must now be broken.
 - **Signatures could be downgraded.** The Dilithium signature was optional
   and verification passed on RSA alone, so stripping the post-quantum
   component was trivial. 0.2.0 makes both signature components fixed,
@@ -134,8 +202,8 @@ Version 0.1.x was not quantum-resistant despite its claims:
   timing "jitter", XOR "blinding" that discarded its factor, an entropy
   counter that measured nothing, an audit that always returned 100%)
   provided no protection and is deleted.
-- Private keys now exist only in seed form (166-byte bundle), zeroized on
-  drop; `Debug` output redacts key material; decryption/verification errors
+- Private keys are now stored and exported only in seed form (166-byte
+  bundle), zeroized on drop; `Debug` output redacts key material; decryption/verification errors
   are uniform and carry no oracle-friendly detail.
 
 ### Changed
@@ -177,7 +245,7 @@ Version 0.1.x was not quantum-resistant despite its claims:
 - `cargo test` compiles and passes (0.1.0 shipped with a non-compiling
   integration test and a deterministically failing unit test).
 
-## [0.1.0] - 2024-10-23
+## [0.1.0] - 2025-10-24
 
 Initial release: RSA-4096 + Kyber-1024 encryption, RSA-PSS + Dilithium5
-signatures. **Withdrawn — see 0.2.0 security notes.**
+signatures. **Insecure by design; do not use. See the 0.2.0 security notes.**

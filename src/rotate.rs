@@ -36,6 +36,7 @@
 //! // ...and rejects it if its epoch does not advance past the last accepted one:
 //! assert!(attestation.epoch() > 0);
 //! # Ok(()) }
+//! # run().unwrap();
 //! ```
 
 use crate::constants::*;

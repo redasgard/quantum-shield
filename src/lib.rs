@@ -26,7 +26,7 @@
 //!
 //! ## Example
 //!
-//! ```no_run
+//! ```
 //! use quantum_shield::{HybridCrypto, verify};
 //!
 //! # fn main() -> quantum_shield::Result<()> {

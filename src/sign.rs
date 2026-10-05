@@ -19,7 +19,6 @@ use crate::keys::{KeyPair, PublicKeyBundle};
 use crate::types::HybridSignature;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use ed25519_dalek::Signer as _;
 use ml_dsa::signature::{Signer as _, Verifier as _};
 use ml_dsa::MlDsa87;
 
