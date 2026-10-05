@@ -1,5 +1,8 @@
 # Rust build artifacts
 /target/
+/ci/**/target/
+/ci/**/Cargo.lock
+/fuzz/target/
 **/*.rs.bk
 *.pdb
 
@@ -13,5 +16,3 @@
 .DS_Store
 Thumbs.db
 
-# Cargo lock file (for libraries)
-Cargo.lock

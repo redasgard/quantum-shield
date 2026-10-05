@@ -17,9 +17,10 @@ use crate::keys::PublicKeyBundle;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+// ml-kem, ml-dsa and ed25519-dalek 3 share one `pkcs8` version, so one import
+// of the SPKI traits covers all three.
 use ed25519_dalek::pkcs8::{DecodePublicKey as _, EncodePublicKey as _};
 use ml_dsa::{KeyExport as _, MlDsa87};
-use ml_kem::pkcs8::{DecodePublicKey as _, EncodePublicKey as _};
 use ml_kem::EncapsulationKey1024;
 
 const X25519_PEM_LABEL: &str = "X25519 PUBLIC KEY";

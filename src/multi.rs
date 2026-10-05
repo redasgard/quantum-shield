@@ -67,7 +67,8 @@ struct Wrap {
 /// Wire layout (`QSM2`):
 ///
 /// ```text
-/// header[6] | recipient_count: u16_be | wrap[0..n] | payload_nonce[12] | payload_ct[..]
+/// header[6] | recipient_count: u16_be | cek_commitment[32]
+///           | wrap[0..n] | payload_nonce[12] | payload_ct[..]
 /// wrap = epk_x25519[32] | ct_mlkem[1568] | wrap_nonce[12] | wrapped_cek[48]
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -273,6 +274,9 @@ pub fn open_multi(keypair: &KeyPair, envelope: &MultiRecipientEnvelope) -> Resul
     let mut payload_aad = Vec::new();
     envelope.write_prefix(&mut payload_aad);
 
+    // Trial-decrypt *every* wrap, even after a match, so the work done (and
+    // so the timing) does not reveal which position is ours.
+    let mut found: Option<Zeroizing<[u8; CEK_LEN]>> = None;
     for wrap in &envelope.wraps {
         let kem_ct = KemCiphertext {
             epk_x25519: wrap.epk_x25519,
@@ -289,32 +293,30 @@ pub fn open_multi(keypair: &KeyPair, envelope: &MultiRecipientEnvelope) -> Resul
         ) else {
             continue;
         };
-
         let cek_vec = Zeroizing::new(cek_vec);
-        let cek: Zeroizing<[u8; CEK_LEN]> = Zeroizing::new(
-            cek_vec
-                .as_slice()
-                .try_into()
-                .map_err(|_| Error::DecryptionFailed)?,
-        );
-
-        // Reject a sender who wrapped a different CEK than it committed to
-        // (equivocation). Constant-time compare against the single commitment.
-        let commit_ok: bool = cek_commitment(&cek).ct_eq(&envelope.cek_commitment).into();
-        if !commit_ok {
-            return Err(Error::DecryptionFailed);
+        if found.is_none() {
+            if let Ok(cek) = <[u8; CEK_LEN]>::try_from(cek_vec.as_slice()) {
+                found = Some(Zeroizing::new(cek));
+            }
         }
-
-        let payload_cipher = Aes256Gcm::new((&*cek).into());
-        return payload_cipher
-            .decrypt(
-                (&envelope.payload_nonce).into(),
-                Payload {
-                    msg: &envelope.payload_ct,
-                    aad: &payload_aad,
-                },
-            )
-            .map_err(|_| Error::DecryptionFailed);
     }
-    Err(Error::DecryptionFailed)
+    let cek = found.ok_or(Error::DecryptionFailed)?;
+
+    // Reject a sender who wrapped a different CEK than it committed to
+    // (equivocation). Constant-time compare against the single commitment.
+    let commit_ok: bool = cek_commitment(&cek).ct_eq(&envelope.cek_commitment).into();
+    if !commit_ok {
+        return Err(Error::DecryptionFailed);
+    }
+
+    let payload_cipher = Aes256Gcm::new((&*cek).into());
+    payload_cipher
+        .decrypt(
+            (&envelope.payload_nonce).into(),
+            Payload {
+                msg: &envelope.payload_ct,
+                aad: &payload_aad,
+            },
+        )
+        .map_err(|_| Error::DecryptionFailed)
 }

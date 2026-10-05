@@ -1,0 +1,5 @@
+# Keep `cargo update` from locking dependency releases that need a newer
+# compiler than the crate's `rust-version` (MSRV 1.85), so the MSRV CI job
+# tests what Cargo.toml claims.
+[resolver]
+incompatible-rust-versions = "fallback"

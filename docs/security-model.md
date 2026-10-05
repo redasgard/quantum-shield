@@ -43,20 +43,26 @@ holds.
   contexts via the length-framed `context` parameter.
 - **Decryption oracles**: ML-KEM implicit rejection plus a single uniform
   `DecryptionFailed` error; error values carry no algorithm detail.
-- **Key-material hygiene**: private keys exist as seeds, zeroized on drop
-  (`zeroize`), never printed by `Debug`. Randomness comes from the OS CSPRNG
+- **Key-material hygiene**: private keys are stored and exported only as
+  seeds; the seeds and the expanded working keys derived from them are
+  zeroized on drop (`zeroize`) and never printed by `Debug`. Randomness comes from the OS CSPRNG
   (`getrandom`) only.
 
 ## Threats NOT addressed
 
-- **Side channels beyond best effort**: the underlying crates are written to
-  be constant-time (dalek, RustCrypto `ml-kem`/`ml-dsa`), but no formal
-  side-channel evaluation has been done on this composition. No claims about
+- **Side channels beyond best effort**: dalek and `aes-gcm` document
+  constant-time implementations; RustCrypto `ml-kem`/`ml-dsa` aim for it but
+  make no formal claim (`ml-dsa` had a timing advisory, RUSTSEC-2025-0144,
+  fixed before the version this crate locks). No formal side-channel
+  evaluation has been done on this composition; the dudect harness is a
+  regression tripwire, not evidence of absence. No claims about
   fault injection, electromagnetic leakage, or speculative-execution
   attacks.
 - **Sender authentication of envelopes**: `seal` is anonymous (like
   `crypto_box_seal`). An envelope proves nothing about who sent it — sign
-  the message if you need that.
+  the message if you need that. The same holds *between recipients* of a
+  multi-recipient envelope: any recipient learns the CEK and can build a
+  different envelope that the other recipients will accept.
 - **Replay**: a valid envelope or signature can be replayed; deduplication
   and freshness are application concerns (put a nonce/timestamp in the
   message or context).

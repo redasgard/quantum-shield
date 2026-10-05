@@ -1,4 +1,7 @@
-# Migrating from quantum-shield 0.1.x to 0.2
+# Migrating from quantum-shield 0.1.x to 0.3
+
+> The v2 formats were developed in an unpublished 0.2 line; the first
+> release on crates.io that carries them is 0.3.0.
 
 ## Why v1 artifacts are rejected
 
@@ -12,11 +15,11 @@ quantum-shield 0.1.x had two critical design flaws:
    and verification passed on RSA alone, so an attacker could remove the
    post-quantum component entirely.
 
-Because the v1 format is unsafe *by construction*, 0.2 does not read it.
+Because the v1 format is unsafe *by construction*, 0.3 does not read it.
 Any v1 input fails with `Error::LegacyV1Artifact`. Continuing to support
 decryption would have preserved the vulnerability indefinitely.
 
-0.2 also replaces the deprecated round-3 `pqcrypto-kyber`/`pqcrypto-dilithium`
+0.3 also replaces the deprecated round-3 `pqcrypto-kyber`/`pqcrypto-dilithium`
 implementations with the final FIPS 203/204 algorithms (ML-KEM, ML-DSA), so
 v1 Kyber ciphertexts are not decryptable by the new stack even in principle.
 
@@ -24,7 +27,7 @@ v1 Kyber ciphertexts are not decryptable by the new stack even in principle.
 
 1. **Decrypt all v1 data with a 0.1.x build** (pin `quantum-shield = "=0.1.0"`
    in a one-off migration tool).
-2. Generate new keypairs with 0.2 (`HybridCrypto::generate()`); v1 keys
+2. Generate new keypairs with 0.3 (`HybridCrypto::generate()`); v1 keys
    cannot be imported — they were RSA/Kyber/Dilithium keys, and the new
    suite uses X25519/ML-KEM/Ed25519/ML-DSA.
 3. Re-encrypt with `seal_for` / re-sign with `sign`, and distribute the new
@@ -34,7 +37,7 @@ v1 Kyber ciphertexts are not decryptable by the new stack even in principle.
 
 ## API changes
 
-| 0.1.x | 0.2 |
+| 0.1.x | 0.3 |
 |---|---|
 | `HybridCrypto::generate_keypair()` | `HybridCrypto::generate()` |
 | `crypto.encrypt(msg, &pubkeys)` | `crypto.seal_for(msg, &bundle)` or `seal(msg, &bundle)` |

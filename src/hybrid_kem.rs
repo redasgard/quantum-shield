@@ -8,18 +8,20 @@
 //!                || ct_mlkem || epk_x25519 || ek_mlkem || pk_x25519 )
 //! ```
 //!
-//! This is the X-Wing construction (draft-connolly-cfrg-xwing-kem) ported to
-//! ML-KEM-1024 with a distinct label, made more conservative by hashing the
-//! full transcript (Chempat-style): both ciphertext components *and* both
-//! recipient public keys enter the KDF, so the derivation does not rely on
-//! any ML-KEM-specific binding property. Because every field is fixed-size,
-//! plain concatenation is injective and needs no length framing.
+//! This is **not** X-Wing (draft-connolly-cfrg-xwing-kem): X-Wing uses
+//! ML-KEM-768, puts its label last, and omits the ML-KEM ciphertext and key
+//! from the hash. This combiner instead hashes the full transcript — both
+//! ciphertext components *and* both recipient public keys — in the style of
+//! Chempat and the CFRG hybrid-KEM "universal combiner", so the derivation
+//! does not rely on any ML-KEM-specific binding property. It has no
+//! dedicated published proof. Because every field is fixed-size, plain
+//! concatenation is injective and needs no length framing.
 //!
-//! Security is the AND of the components: an attacker must break **both**
-//! X25519 (classical) and ML-KEM-1024 (post-quantum) to recover `ss`. This
-//! is also why no X25519 contributory-behavior check is needed: even if a
-//! malicious peer forces a low-order `ss_x25519`, the ML-KEM secret and the
-//! transcript still randomize the output.
+//! The intent is that an attacker must break **both** X25519 (classical) and
+//! ML-KEM-1024 (post-quantum) to recover `ss`. Recipient X25519 keys are
+//! checked for low order when a [`PublicKeyBundle`] is parsed; a low-order
+//! *ephemeral* key from a malicious sender only makes `ss_x25519`
+//! predictable, and the ML-KEM secret still randomizes the output.
 //!
 //! ML-KEM decapsulation never fails (implicit rejection): a tampered
 //! ciphertext yields a uniformly random secret, surfacing only as an AEAD
@@ -48,7 +50,7 @@ pub(crate) fn encapsulate(
     getrandom::fill(eph_bytes.as_mut()).map_err(|_| Error::RandomnessUnavailable)?;
     let mut m = Zeroizing::new([0u8; 32]);
     getrandom::fill(m.as_mut()).map_err(|_| Error::RandomnessUnavailable)?;
-    Ok(encapsulate_deterministic(recipient, *eph_bytes, &m))
+    Ok(encapsulate_deterministic(recipient, &eph_bytes, &m))
 }
 
 /// The deterministic core of encapsulation: all randomness is supplied by
@@ -57,17 +59,21 @@ pub(crate) fn encapsulate(
 /// known-answer tests may call this.
 fn encapsulate_deterministic(
     recipient: &PublicKeyBundle,
-    eph_bytes: [u8; X25519_SK_LEN],
+    eph_bytes: &[u8; X25519_SK_LEN],
     m: &[u8; 32],
 ) -> (KemCiphertext, Zeroizing<[u8; 32]>) {
     // StaticSecret rather than EphemeralSecret because the latter cannot be
     // built from caller-provided bytes; the secret still lives only for this
     // function call.
-    let eph_sk = x25519_dalek::StaticSecret::from(eph_bytes);
+    let eph_sk = x25519_dalek::StaticSecret::from(*eph_bytes);
     let epk = x25519_dalek::PublicKey::from(&eph_sk);
     let ss_x25519 = eph_sk.diffie_hellman(&recipient.x25519);
 
+    // ml-kem's deterministic encapsulation is hidden upstream because a reused
+    // or predictable `m` is catastrophic. Here `m` is always 32 fresh OS-RNG
+    // bytes from [`encapsulate`]; only the known-answer test passes fixed bytes.
     let (ct_mlkem, ss_mlkem) = recipient.mlkem.encapsulate_deterministic(&(*m).into());
+    let ss_mlkem = Zeroizing::new(ss_mlkem);
 
     let ct_mlkem_bytes: [u8; MLKEM1024_CT_LEN] = ct_mlkem.into();
     let ss = combine(
@@ -93,7 +99,7 @@ pub(crate) fn decapsulate(keypair: &KeyPair, ct: &KemCiphertext) -> Zeroizing<[u
     let ss_x25519 = keypair.x25519_sk.diffie_hellman(&epk);
 
     let ct_mlkem = ml_kem::ml_kem_1024::Ciphertext::from(*ct.ct_mlkem);
-    let ss_mlkem = keypair.mlkem_dk.decapsulate(&ct_mlkem);
+    let ss_mlkem = Zeroizing::new(keypair.mlkem_dk.decapsulate(&ct_mlkem));
 
     combine(
         &ss_mlkem,
@@ -178,10 +184,10 @@ mod tests {
             ed25519_seed: [0x03; 32],
             mldsa_seed: [0x04; 32],
         });
-        let (ct, ss) = encapsulate_deterministic(kp.public_keys(), [0x05; 32], &[0x06; 32]);
+        let (ct, ss) = encapsulate_deterministic(kp.public_keys(), &[0x05; 32], &[0x06; 32]);
 
         // Deterministic: same inputs, same outputs.
-        let (ct2, ss2) = encapsulate_deterministic(kp.public_keys(), [0x05; 32], &[0x06; 32]);
+        let (ct2, ss2) = encapsulate_deterministic(kp.public_keys(), &[0x05; 32], &[0x06; 32]);
         assert_eq!(ct.epk_x25519, ct2.epk_x25519);
         assert_eq!(ct.ct_mlkem, ct2.ct_mlkem);
         assert_eq!(*ss, *ss2);

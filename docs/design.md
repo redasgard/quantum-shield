@@ -2,8 +2,10 @@
 
 This document is the normative specification of the quantum-shield v2
 formats. An independent implementation following this document interoperates
-with this crate. All multi-byte fields are raw bytes (no endianness
-concerns); all sizes are fixed by the suite.
+with this crate: `ci/interop/cleanroom.py` is one, written from this document
+alone, and CI checks that it opens and verifies every format this crate
+produces. Integer fields (counts, lengths, indices, epochs) are big-endian;
+keys, ciphertexts, nonces and signatures are raw fixed-size byte strings.
 
 ## Suite
 
@@ -31,7 +33,8 @@ magic[4] || version: u8 (= 2) || suite: u8 (= 1)
 ```
 
 Magics: `QSE2` envelope, `QSS2` signature, `QSP2` public key bundle,
-`QSK2` secret key bundle. Inputs beginning with `{` (0x7B) are quantum-shield
+`QSK2` secret key bundle, `QSM2` multi-recipient envelope, `QST2` stream
+header, `QSR2` rotation attestation. Inputs beginning with `{` (0x7B) are quantum-shield
 0.1.x JSON artifacts and must be rejected with a dedicated error.
 
 ## Hybrid KEM
@@ -57,17 +60,21 @@ ss = SHA3-256( "quantum-shield/v2/kem:X25519+ML-KEM-1024\0"
 The label includes a trailing NUL byte. Every field is fixed-size, so the
 concatenation is injective without length framing.
 
-This is the X-Wing combiner (draft-connolly-cfrg-xwing-kem) ported to
-ML-KEM-1024 with a distinct label, hardened by hashing the full transcript
-(both ciphertext components and both recipient public keys, in the style of
-Chempat), so the derivation does not depend on ML-KEM-specific binding
-properties. `ss` is used directly as the AES-256-GCM key.
+This is **not** X-Wing (draft-connolly-cfrg-xwing-kem), which uses
+ML-KEM-768, places its label last, and does not hash the ML-KEM ciphertext or
+encapsulation key. This combiner hashes the full transcript (both ciphertext
+components and both recipient public keys), in the style of Chempat and the
+CFRG hybrid-KEM "universal combiner", so the derivation does not depend on
+ML-KEM-specific binding properties. It has no dedicated published security
+proof. `ss` is used directly as the AES-256-GCM key.
 
 Decapsulation recomputes `ss_x25519` from the recipient's static secret and
 `epk_x25519`, decapsulates `ct_mlkem` (ML-KEM implicit rejection applies:
 tampered ciphertexts yield a random secret, never an error), and applies the
-same combiner. No X25519 contributory check is performed; the ML-KEM secret
-and the hashed transcript make low-order inputs harmless.
+same combiner. Recipient X25519 keys are checked for low order when a
+`QSP2` bundle is parsed (see below). The sender's ephemeral key is not
+checked on decapsulation: a low-order `epk_x25519` only makes `ss_x25519`
+predictable, and the ML-KEM secret still randomizes `ss`.
 
 ## Envelope (`QSE2`)
 
@@ -118,9 +125,17 @@ one signature alone.
 header[6] || x25519_pk[32] || mlkem_ek[1568] || ed25519_pk[32] || mldsa_vk[2592]
 ```
 
-Parsers must validate components: ML-KEM encapsulation keys re-encode
-canonically (modulus check), Ed25519 points decompress. A bundle that fails
-any component check is invalid as a whole.
+Parsers must validate components:
+
+- X25519: reject low-order points (including all-zero), i.e. any key for
+  which Diffie-Hellman is non-contributory. Otherwise the hybrid KEM would
+  silently degrade to ML-KEM alone for that recipient.
+- ML-KEM-1024: the FIPS 203 §7.2 encapsulation-key (modulus) check.
+- Ed25519: the point must decompress, be canonically encoded (`y < p`), and
+  not have small order.
+- ML-DSA-87: length only (every bit pattern decodes to a valid `t1`).
+
+A bundle that fails any component check is invalid as a whole.
 
 ## Secret key bundle (`QSK2`, fixed 166 bytes)
 
@@ -197,11 +212,13 @@ For chunk index `i` (0-based, `u32`):
 - `aad = stream_header || i as u32_be || last`
 - `chunk_ct = AES-256-GCM(key = ss, nonce, plaintext_chunk, aad)`
 
-Plaintext chunks are 64 KiB except the last. The final chunk sets `last = 1`;
+The sender chooses each chunk's plaintext length (at most 2^32 − 17 bytes, so
+that `chunk_ct_len` fits a `u32`); 64 KiB (`STREAM_CHUNK_SIZE`) is the
+recommended size. The final chunk sets `last = 1`;
 a stream with no `last = 1` chunk is a truncation and must be rejected at
 finalization. Binding the index and last-flag into both the nonce and the AAD
 makes reordering, duplication, dropping, and truncation fail. Implementations
-must reject a `u32` counter overflow (2^32 chunks = 256 TiB).
+must reject a `u32` counter overflow (2^32 chunks).
 
 ## Rotation attestation (`QSR2`, fixed 8941 bytes)
 
@@ -229,6 +246,10 @@ stateless and cannot enforce this — it only binds and exposes the epoch.
 
 ## Stability
 
-The formats above are covered by known-answer tests (`tests/golden.rs` and
-the KAT in `src/hybrid_kem.rs`). Any change to them requires a new format
-version, not an update to the pinned vectors.
+`QSE2`, `QSS2`, `QSP2`/`QSK2` key derivation, `key_id`, and `QSR2` are pinned
+by golden vectors (`tests/golden.rs`, and the combiner vector in
+`src/hybrid_kem.rs`). Those are regression pins of this crate's own output,
+not external known-answer tests; the external checks are the NIST ACVP
+vectors in `tests/acvp.rs` and the independent implementation in
+`ci/interop/`, which covers all seven formats. Any change to a format
+requires a new format version, not an update to the pinned vectors.

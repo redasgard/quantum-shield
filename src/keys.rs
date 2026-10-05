@@ -187,12 +187,14 @@ impl PublicKeyBundle {
     /// Parse a v2 public-key bundle, validating the length and the components
     /// that support validation.
     ///
-    /// The X25519, ML-KEM-1024, and Ed25519 components are checked (a
-    /// non-canonical Ed25519 point or an out-of-range ML-KEM key is rejected).
-    /// ML-DSA-87 verifying keys have no upstream validation and are only
-    /// length-checked; a structurally-invalid one simply fails verification
-    /// later. X25519 has no point validation by design (every 32-byte string is
-    /// a valid u-coordinate).
+    /// - X25519: rejected if it is a low-order point (including all-zero), i.e.
+    ///   if Diffie-Hellman with it would be non-contributory. Such a key would
+    ///   silently reduce the hybrid KEM to ML-KEM alone.
+    /// - ML-KEM-1024: the FIPS 203 §7.2 modulus check.
+    /// - Ed25519: the point must decompress, be canonically encoded, and not
+    ///   be of small order.
+    /// - ML-DSA-87: length only. Every bit pattern of the right length decodes
+    ///   to a valid `t1`, so there is nothing further to check.
     ///
     /// # Errors
     ///
@@ -210,10 +212,19 @@ impl PublicKeyBundle {
         }
 
         let x25519 = x25519_dalek::PublicKey::from(x25519_bytes);
+        if !x25519_is_contributory(&x25519) {
+            return Err(Error::InvalidKey);
+        }
         let mlkem =
             EncapsulationKey1024::new(&mlkem_bytes.into()).map_err(|_| Error::InvalidKey)?;
         let ed25519 = ed25519_dalek::VerifyingKey::from_bytes(&ed25519_bytes)
             .map_err(|_| Error::InvalidKey)?;
+        // `from_bytes` reduces a y-coordinate >= p instead of rejecting it, so
+        // re-encode to reject non-canonical encodings (which would otherwise
+        // give one key several bundle encodings and key ids).
+        if ed25519.is_weak() || ed25519.to_edwards().compress().to_bytes() != ed25519_bytes {
+            return Err(Error::InvalidKey);
+        }
         let mldsa = ml_dsa::VerifyingKey::<MlDsa87>::decode(&mldsa_bytes.into());
 
         Ok(Self {
@@ -223,6 +234,15 @@ impl PublicKeyBundle {
             mldsa: Box::new(mldsa),
         })
     }
+}
+
+/// Whether X25519 with `pk` is contributory. A low-order `pk` yields the
+/// all-zero shared secret for every clamped scalar (clamping clears the
+/// cofactor), so one fixed probe scalar decides it.
+fn x25519_is_contributory(pk: &x25519_dalek::PublicKey) -> bool {
+    x25519_dalek::StaticSecret::from([0x5a; X25519_SK_LEN])
+        .diffie_hellman(pk)
+        .was_contributory()
 }
 
 impl core::fmt::Debug for PublicKeyBundle {
@@ -252,7 +272,6 @@ mod tests {
         assert_eq!(kp.public.mlkem.to_bytes().len(), MLKEM1024_EK_LEN);
         assert_eq!(kp.public.mldsa.encode().len(), MLDSA87_VK_LEN);
         use ed25519_dalek::Signer as _;
-        use ml_dsa::signature::Signer as _;
         let ed_sig = kp.ed25519_sk.sign(b"x");
         assert_eq!(ed_sig.to_bytes().len(), ED25519_SIG_LEN);
         let pq_sig: ml_dsa::Signature<MlDsa87> = kp.mldsa_sk.sign(b"x");

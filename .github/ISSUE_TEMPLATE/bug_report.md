@@ -35,7 +35,7 @@ fn main() -> anyhow::Result<()> {
 
 ## Environment
 - **OS**: [e.g. Ubuntu 22.04, Windows 11, macOS 13.0]
-- **Rust Version**: [e.g. 1.70.0]
+- **Rust Version**: [e.g. 1.85.0]
 - **quantum-shield Version**: [e.g. 0.1.0]
 - **Architecture**: [e.g. x86_64, aarch64]
 
